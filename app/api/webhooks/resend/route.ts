@@ -47,17 +47,26 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    if (!event || !event.type) {
+    // Support both Resend webhook wrappers and direct email worker payloads
+    let eventType = event.type;
+    let eventData = event.data;
+
+    if (!eventType && (event.from || event.to)) {
+      eventType = "email.received";
+      eventData = event;
+    }
+
+    if (!eventType) {
       return NextResponse.json(
-        { error: "Missing event type in payload" },
+        { error: "Missing event type or email payload" },
         { status: 400 }
       );
     }
 
     // Process event based on type
-    switch (event.type) {
+    switch (eventType) {
       case "email.received":
-        await handleInboundEmail(event.data);
+        await handleInboundEmail(eventData);
         break;
 
       case "email.sent":
@@ -66,11 +75,11 @@ export async function POST(req: NextRequest) {
       case "email.complained":
       case "email.opened":
       case "email.clicked":
-        await handleDeliveryEvent(event.type, event.data);
+        await handleDeliveryEvent(eventType, eventData);
         break;
 
       default:
-        console.log(`Unhandled Resend webhook event type: ${event.type}`);
+        console.log(`Unhandled Resend webhook event type: ${eventType}`);
     }
 
     return NextResponse.json({ success: true, event: event.type }, { status: 200 });
