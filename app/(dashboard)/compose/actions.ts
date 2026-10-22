@@ -6,6 +6,7 @@ import { revalidatePath } from "next/cache";
 export async function sendEmailAction(
   formData: FormData
 ): Promise<SendEmailResult> {
+  const from = (formData.get("from") as string) || undefined;
   const toRaw = (formData.get("to") as string) || "";
   const ccRaw = (formData.get("cc") as string) || "";
   const bccRaw = (formData.get("bcc") as string) || "";
@@ -35,6 +36,7 @@ export async function sendEmailAction(
 
   const result = await sendEmail({
     to,
+    from,
     cc,
     bcc,
     subject,
@@ -47,4 +49,3 @@ export async function sendEmailAction(
 
   return result;
 }
-

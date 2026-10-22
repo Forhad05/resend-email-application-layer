@@ -106,6 +106,28 @@ export const verification = pgTable(
 // CORE APPLICATION TABLES
 // ==============================================================================
 
+// Sender identities / mailboxes for outbound emails
+export const senderIdentities = pgTable(
+  "sender_identities",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    name: text("name").notNull(), // e.g. "Contracts", "Support", "Mahafuzul"
+    email: text("email").notNull().unique(), // e.g. "contracts@mail.systemdevify.com"
+    domain: text("domain").notNull(), // e.g. "mail.systemdevify.com"
+    isDefault: boolean("is_default").notNull().default(false),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_sender_identities_email").on(table.email),
+    index("idx_sender_identities_domain").on(table.domain),
+  ]
+);
+
 // External contacts / customers
 export const contacts = pgTable(
   "contacts",
