@@ -8,6 +8,7 @@ import {
 } from "@/lib/db/schema";
 import { eq, or, sql, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
+import PostalMime from "postal-mime";
 
 export interface ResendInboundPayload {
   email_id?: string;
@@ -17,6 +18,7 @@ export interface ResendInboundPayload {
   subject?: string;
   html?: string;
   text?: string;
+  raw?: string;
   headers?: Record<string, string | string[]>;
   attachments?: Array<{
     id?: string;
@@ -63,6 +65,35 @@ function normalizeSubject(sub: string | null | undefined): string {
 }
 
 export async function handleInboundEmail(data: ResendInboundPayload) {
+  // If raw RFC 822 email was provided (e.g. from Cloudflare Worker without client-side parsing)
+  if (data.raw && (!data.text && !data.html)) {
+    try {
+      const parser = new PostalMime();
+      const parsed = await parser.parse(data.raw);
+      data.text = parsed.text || "";
+      data.html = parsed.html || parsed.text || "";
+      if (!data.subject && parsed.subject) {
+        data.subject = parsed.subject;
+      }
+      if (!data.headers) {
+        data.headers = {};
+      }
+      if (parsed.messageId && !data.headers["message-id"]) {
+        data.headers["message-id"] = parsed.messageId;
+      }
+      if (parsed.inReplyTo && !data.headers["in-reply-to"]) {
+        data.headers["in-reply-to"] = parsed.inReplyTo;
+      }
+      if (parsed.references && !data.headers["references"]) {
+        data.headers["references"] = Array.isArray(parsed.references)
+          ? parsed.references.join(" ")
+          : String(parsed.references);
+      }
+    } catch (parseErr) {
+      console.warn("Failed to parse raw MIME email body:", parseErr);
+    }
+  }
+
   const { name: fromName, email: fromEmail } = parseEmailAndName(data.from || "");
   const toList = Array.isArray(data.to)
     ? data.to.map((t) => t.trim().toLowerCase())
