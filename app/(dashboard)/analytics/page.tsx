@@ -63,7 +63,7 @@ async function StatsGrid() {
 
 export default function AnalyticsPage() {
   return (
-    <div className="space-y-6 max-w-5xl">
+    <div className="max-w-5xl mx-auto space-y-6">
       <div>
         <h1 className="text-2xl font-bold tracking-tight text-zinc-900 dark:text-zinc-100">
           Analytics & Metrics
