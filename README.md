@@ -805,6 +805,9 @@ email-application/
 │   ├── resend.ts                        # Resend SDK Client Initialization
 │   └── utils.ts                         # Tailwind CSS Utility Class Merging (clsx + twMerge)
 ├── middleware.ts                        # Edge Ingress Defense Shield (CVE-2026-111497)
+├── docker-compose.yml                   # Multi-Service Docker Compose (Postgres + Web)
+├── Dockerfile                           # Production Multi-Stage Standalone Dockerfile
+├── .dockerignore                        # Docker Build Context Exclusions
 ├── drizzle.config.ts                    # Drizzle Kit Configuration
 ├── next.config.ts                       # Next.js 16 Configuration (PPR & Route Redirects)
 ├── package.json                         # Dependencies & Orchestration Scripts
@@ -859,18 +862,26 @@ BETTER_AUTH_SECRET="your_generated_random_secret_here"
 > [!TIP]
 > Generate a cryptographically secure secret for Better Auth via `openssl rand -hex 32`.
 
-### 4. Database Setup
+### 4. Database Setup & Docker Execution
 
-Start the PostgreSQL 16 Docker container:
+#### Option A: Quickstart Full Stack with Docker Compose
+
+Run the entire application (Next.js web app + PostgreSQL database) with a single command:
 
 ```bash
-docker run -d \
-  --name email-tool-postgres \
-  -e POSTGRES_USER=postgres \
-  -e POSTGRES_PASSWORD=postgres \
-  -e POSTGRES_DB=email_tool \
-  -p 5432:5432 \
-  postgres:16
+docker compose up -d
+# or using the package.json shortcut:
+npm run docker:up
+```
+
+#### Option B: Run Database Only for Local Development
+
+Start just the PostgreSQL container:
+
+```bash
+docker compose up -d postgres
+# or using the package.json shortcut:
+npm run db:start
 ```
 
 Apply database migrations:
@@ -881,13 +892,13 @@ npx drizzle-kit push
 
 ### 5. Start Development Server
 
-Run the development server with Next.js Turbopack:
+Run the development server with Next.js Turbopack on your host:
 
 ```bash
 npm run dev
 ```
 
-Or run the fully automated stack (Docker start + Next.js Turbopack + Cloudflare Tunnel):
+Or run the fully automated stack (Docker Postgres + Next.js Turbopack + Cloudflare Tunnel):
 
 ```bash
 npm run dev:all
@@ -903,10 +914,13 @@ Open [http://localhost:3000](http://localhost:3000) in your browser. Default tem
 | :--- | :--- |
 | `npm run dev` | Starts Next.js development server with Turbopack. |
 | `npm run dev:all` | Concurrently starts Docker Postgres, Next.js dev server, and Cloudflare tunnel. |
-| `npm run db:start` | Starts the `email-tool-postgres` Docker container. |
-| `npm run db:stop` | Stops the `email-tool-postgres` Docker container. |
+| `npm run db:start` | Starts PostgreSQL container via `docker compose up -d postgres`. |
+| `npm run db:stop` | Stops PostgreSQL container via `docker compose stop postgres`. |
+| `npm run docker:up` | Boots the entire application stack (Next.js + Postgres) with Docker Compose. |
+| `npm run docker:down` | Stops and removes Docker Compose containers and networks. |
+| `npm run docker:build` | Rebuilds the production Next.js Docker image. |
 | `npm run build` | Compiles an optimized production build with Next.js 16 Partial Prerendering. |
-| `npm run start` | Boots the compiled production application. |
+| `npm run start` | Boots the compiled production application on the host. |
 | `npm run lint` | Runs ESLint across all codebase files. |
 
 ---

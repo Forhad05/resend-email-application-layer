@@ -4,9 +4,12 @@
   "private": true,
   "scripts": {
     "dev": "next dev",
-    "dev:all": "docker start email-tool-postgres && npx concurrently -k -n \"next,tunnel\" -c \"cyan,magenta\" \"next dev\" \"npx wait-on tcp:3000 && cloudflared tunnel --url http://localhost:3000\"",
-    "db:start": "docker start email-tool-postgres",
-    "db:stop": "docker stop email-tool-postgres",
+    "dev:all": "docker compose up -d postgres && npx concurrently -k -n \"next,tunnel\" -c \"cyan,magenta\" \"next dev\" \"npx wait-on tcp:3000 && cloudflared tunnel --url http://localhost:3000\"",
+    "db:start": "docker compose up -d postgres",
+    "db:stop": "docker compose stop postgres",
+    "docker:up": "docker compose up -d",
+    "docker:down": "docker compose down",
+    "docker:build": "docker compose build",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
