@@ -4,6 +4,8 @@ import { db } from "@/lib/db";
 import { threads, messages } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { ThreadReplyBox } from "@/components/inbox/ThreadReplyBox";
+import { ThreadLiveRefresher } from "@/components/inbox/ThreadLiveRefresher";
+import { DeliveryStatusBadge } from "@/components/inbox/DeliveryStatusBadge";
 import { ArrowLeft, Clock, ShieldCheck } from "lucide-react";
 import Link from "next/link";
 
@@ -48,6 +50,13 @@ async function ThreadDetails({
                 {messageList.length}{" "}
                 {messageList.length === 1 ? "message" : "messages"}
               </span>
+              <span className="text-zinc-300 dark:text-zinc-700">•</span>
+              <ThreadLiveRefresher
+                threadId={thread.id}
+                initialMessageCount={thread.messageCount || messageList.length}
+                initialLastMessageAt={thread.lastMessageAt?.toISOString() || null}
+                isRead={thread.isRead}
+              />
             </div>
             <h1 className="text-xl font-bold text-zinc-900 dark:text-zinc-100 mt-2">
               {thread.subject}
@@ -116,13 +125,16 @@ async function ThreadDetails({
                 {msg.textBody || msg.htmlBody || "(No content)"}
               </div>
 
-              {/* Status footer for outbound */}
+              {/* Status footer for outbound messages */}
               {isOutbound && (
                 <div className="mt-3 pt-2 flex items-center justify-between text-[11px] text-zinc-400 border-t border-zinc-100 dark:border-zinc-800/60">
-                  <span className="flex items-center gap-1">
-                    <ShieldCheck className="h-3 w-3 text-emerald-500" />
-                    Sent via Resend
-                  </span>
+                  <div className="flex items-center gap-2">
+                    <span className="flex items-center gap-1">
+                      <ShieldCheck className="h-3 w-3 text-emerald-500" />
+                      Resend
+                    </span>
+                    <DeliveryStatusBadge status={msg.status} />
+                  </div>
                   {msg.resendEmailId && (
                     <span className="font-mono text-[10px]">
                       ID: {msg.resendEmailId}
@@ -172,4 +184,3 @@ export default function ThreadPage({ params }: PageProps) {
     </div>
   );
 }
-
