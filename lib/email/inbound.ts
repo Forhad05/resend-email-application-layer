@@ -295,7 +295,7 @@ export async function handleDeliveryEvent(
   eventData: {
     email_id?: string;
     to?: string | string[];
-    [key: string]: any;
+    [key: string]: unknown;
   }
 ) {
   const emailId = eventData.email_id;

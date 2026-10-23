@@ -23,8 +23,6 @@ export function InboxLiveRefresher({
   }, [latestTimestamp, unreadCount]);
 
   useEffect(() => {
-    let timer: NodeJS.Timeout;
-
     const performCheck = async () => {
       if (document.visibilityState !== "visible") return;
 
@@ -45,7 +43,7 @@ export function InboxLiveRefresher({
     };
 
     // Poll every 5 seconds
-    timer = setInterval(performCheck, 5000);
+    const timer = setInterval(performCheck, 5000);
 
     const onFocus = () => {
       performCheck();

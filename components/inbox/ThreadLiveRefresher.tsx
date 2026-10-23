@@ -6,7 +6,7 @@ import {
   checkThreadUpdatesAction,
   markThreadAsReadAction,
 } from "@/app/(dashboard)/inbox/[threadId]/actions";
-import { Mail, RefreshCw } from "lucide-react";
+import { Mail } from "lucide-react";
 
 interface ThreadLiveRefresherProps {
   threadId: string;
@@ -43,8 +43,6 @@ export function ThreadLiveRefresher({
 
   // 2. Periodic polling & focus checking
   useEffect(() => {
-    let timer: NodeJS.Timeout;
-
     const performSyncCheck = async () => {
       if (document.visibilityState !== "visible") return;
 
@@ -75,7 +73,7 @@ export function ThreadLiveRefresher({
     };
 
     // Poll every 4 seconds
-    timer = setInterval(performSyncCheck, 4000);
+    const timer = setInterval(performSyncCheck, 4000);
 
     // Also check immediately when window receives focus
     const onFocus = () => {

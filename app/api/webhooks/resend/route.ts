@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resend } from "@/lib/resend";
-import { handleInboundEmail, handleDeliveryEvent } from "@/lib/email/inbound";
+import {
+  handleInboundEmail,
+  handleDeliveryEvent,
+  ResendInboundPayload,
+} from "@/lib/email/inbound";
 
 export async function POST(req: NextRequest) {
   try {
@@ -11,11 +15,11 @@ export async function POST(req: NextRequest) {
     const svixTimestamp = req.headers.get("svix-timestamp");
     const svixSignature = req.headers.get("svix-signature");
 
-    let event: any;
+    let event: Record<string, unknown>;
 
     if (webhookSecret && svixId && svixTimestamp && svixSignature) {
       try {
-        event = resend.webhooks.verify({
+        event = (resend.webhooks.verify({
           payload: rawPayload,
           headers: {
             id: svixId,
@@ -23,9 +27,9 @@ export async function POST(req: NextRequest) {
             signature: svixSignature,
           },
           webhookSecret: webhookSecret,
-        });
-      } catch (verifyError: any) {
-        console.error("Resend webhook signature verification failed:", verifyError.message);
+        }) as unknown) as Record<string, unknown>;
+      } catch (verifyError: unknown) {
+        console.error("Resend webhook signature verification failed:", (verifyError as Error).message);
         return NextResponse.json(
           { error: "Invalid webhook signature" },
           { status: 401 }
@@ -48,7 +52,7 @@ export async function POST(req: NextRequest) {
     }
 
     // Support both Resend webhook wrappers and direct email worker payloads
-    let eventType = event.type;
+    let eventType = typeof event.type === "string" ? event.type : null;
     let eventData = event.data;
 
     if (!eventType && (event.from || event.to)) {
@@ -66,7 +70,7 @@ export async function POST(req: NextRequest) {
     // Process event based on type
     switch (eventType) {
       case "email.received":
-        await handleInboundEmail(eventData);
+        await handleInboundEmail(eventData as ResendInboundPayload);
         break;
 
       case "email.sent":
@@ -75,7 +79,10 @@ export async function POST(req: NextRequest) {
       case "email.complained":
       case "email.opened":
       case "email.clicked":
-        await handleDeliveryEvent(eventType, eventData);
+        await handleDeliveryEvent(
+          eventType,
+          (eventData || event) as { email_id?: string; to?: string | string[] }
+        );
         break;
 
       default:
@@ -83,10 +90,11 @@ export async function POST(req: NextRequest) {
     }
 
     return NextResponse.json({ success: true, event: event.type }, { status: 200 });
-  } catch (error: any) {
-    console.error("Error processing Resend webhook:", error);
+  } catch (error: unknown) {
+    const err = error as Error;
+    console.error("Error processing Resend webhook:", err);
     return NextResponse.json(
-      { error: error.message || "Internal server error" },
+      { error: err.message || "Internal server error" },
       { status: 500 }
     );
   }

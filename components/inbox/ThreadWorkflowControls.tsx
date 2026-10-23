@@ -11,9 +11,7 @@ import {
   Clock,
   AlertTriangle,
   User,
-  Shield,
   Loader2,
-  Check,
   ChevronDown,
 } from "lucide-react";
 

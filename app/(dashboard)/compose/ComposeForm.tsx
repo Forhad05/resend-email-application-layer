@@ -51,12 +51,11 @@ export function ComposeForm({ senders }: { senders: SenderIdentity[] }) {
 
   // Debounced check to see if recipient is on suppression list
   useEffect(() => {
-    if (!to.trim() || !to.includes("@")) {
-      setSuppressionInfo({ isSuppressed: false });
-      return;
-    }
-
     const timer = setTimeout(async () => {
+      if (!to.trim() || !to.includes("@")) {
+        setSuppressionInfo({ isSuppressed: false });
+        return;
+      }
       const res = await checkRecipientSuppressionAction(to);
       setSuppressionInfo(res);
     }, 350);

@@ -4,14 +4,10 @@ import { useState, useMemo } from "react";
 import Link from "next/link";
 import {
   Inbox,
-  Mail,
   Search,
-  Filter,
   User,
   AlertCircle,
   AlertTriangle,
-  Clock,
-  CheckCircle2,
   X,
 } from "lucide-react";
 import { InboxLiveRefresher } from "./InboxLiveRefresher";

@@ -12,7 +12,6 @@ import {
   Edit2,
   X,
   Loader2,
-  Check,
   Send,
 } from "lucide-react";
 import Link from "next/link";
@@ -232,6 +231,8 @@ export function ContactsView({ contacts }: ContactsViewProps) {
                           {c.phone}
                         </span>
                       )}
+                      <span className="text-zinc-400">•</span>
+                      <span className="text-zinc-400">Added {dateStr}</span>
                     </div>
                   </div>
                 </div>

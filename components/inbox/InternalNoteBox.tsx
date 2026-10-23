@@ -8,7 +8,7 @@ interface InternalNoteBoxProps {
   threadId: string;
 }
 
-export function InternalNoteBox({ threadId }: { threadId: string }) {
+export function InternalNoteBox({ threadId }: InternalNoteBoxProps) {
   const [content, setContent] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
