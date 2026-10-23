@@ -2,6 +2,9 @@
 
 import { sendEmail, SendEmailResult } from "@/lib/email/send";
 import { revalidatePath } from "next/cache";
+import { db } from "@/lib/db";
+import { suppressions } from "@/lib/db/schema";
+import { eq } from "drizzle-orm";
 
 export async function sendEmailAction(
   formData: FormData
@@ -48,4 +51,43 @@ export async function sendEmailAction(
   }
 
   return result;
+}
+
+export async function checkRecipientSuppressionAction(emailOrEmails: string): Promise<{
+  isSuppressed: boolean;
+  suppressedEmail?: string;
+  reason?: string;
+}> {
+  try {
+    const rawTokens = emailOrEmails
+      .split(/[,;\s]+/)
+      .map((s) => s.trim().toLowerCase())
+      .filter((s) => s.includes("@"));
+
+    if (rawTokens.length === 0) {
+      return { isSuppressed: false };
+    }
+
+    for (const token of rawTokens) {
+      const clean = token.replace(/^.*<([^>]+)>.*$/, "$1");
+      const [record] = await db
+        .select({ reason: suppressions.reason })
+        .from(suppressions)
+        .where(eq(suppressions.email, clean))
+        .limit(1);
+
+      if (record) {
+        return {
+          isSuppressed: true,
+          suppressedEmail: clean,
+          reason: record.reason,
+        };
+      }
+    }
+
+    return { isSuppressed: false };
+  } catch (err: unknown) {
+    console.warn("Could not check suppression list:", err);
+    return { isSuppressed: false };
+  }
 }

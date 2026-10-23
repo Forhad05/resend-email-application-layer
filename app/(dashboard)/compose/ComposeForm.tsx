@@ -1,9 +1,19 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useEffect } from "react";
 import { useRouter } from "next/navigation";
-import { sendEmailAction } from "./actions";
-import { Send, Eye, Edit3, AlertCircle, Loader2, X, ChevronDown, Settings2 } from "lucide-react";
+import { sendEmailAction, checkRecipientSuppressionAction } from "./actions";
+import {
+  Send,
+  Eye,
+  Edit3,
+  AlertCircle,
+  Loader2,
+  X,
+  ChevronDown,
+  Settings2,
+  ShieldAlert,
+} from "lucide-react";
 import Link from "next/link";
 
 interface SenderIdentity {
@@ -33,10 +43,37 @@ export function ComposeForm({ senders }: { senders: SenderIdentity[] }) {
 
   const [activeTab, setActiveTab] = useState<"write" | "preview">("write");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const [suppressionInfo, setSuppressionInfo] = useState<{
+    isSuppressed: boolean;
+    suppressedEmail?: string;
+    reason?: string;
+  }>({ isSuppressed: false });
+
+  // Debounced check to see if recipient is on suppression list
+  useEffect(() => {
+    if (!to.trim() || !to.includes("@")) {
+      setSuppressionInfo({ isSuppressed: false });
+      return;
+    }
+
+    const timer = setTimeout(async () => {
+      const res = await checkRecipientSuppressionAction(to);
+      setSuppressionInfo(res);
+    }, 350);
+
+    return () => clearTimeout(timer);
+  }, [to]);
 
   const handleSubmit = (e: React.FormEvent<HTMLFormElement>) => {
     e.preventDefault();
     setErrorMessage(null);
+
+    if (suppressionInfo.isSuppressed) {
+      setErrorMessage(
+        `Cannot send email: ${suppressionInfo.suppressedEmail} is on the suppression list.`
+      );
+      return;
+    }
 
     // Format From with Name if matching sender found
     const selectedObj = senders.find((s) => s.email === fromEmail);
@@ -116,7 +153,7 @@ export function ComposeForm({ senders }: { senders: SenderIdentity[] }) {
                     id="from"
                     value={fromEmail}
                     onChange={(e) => setFromEmail(e.target.value)}
-                    className="w-full appearance-none bg-white dark:bg-zinc-800 text-sm font-medium text-zinc-900 dark:text-zinc-100 border border-zinc-200 dark:border-zinc-700 rounded-lg pl-3 pr-8 py-1.5 focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white shadow-sm"
+                    className="w-full appearance-none bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg px-3 py-1.5 text-xs text-zinc-900 dark:text-zinc-100 pr-8 focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
                   >
                     {senders.length === 0 && (
                       <option value="">Default Resend Sender</option>
@@ -178,6 +215,18 @@ export function ComposeForm({ senders }: { senders: SenderIdentity[] }) {
                 )}
               </div>
             </div>
+
+            {/* Suppression Warning Banner */}
+            {suppressionInfo.isSuppressed && (
+              <div className="mx-4 my-2 p-3 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-800 dark:text-red-300 text-xs flex items-center gap-2.5">
+                <ShieldAlert className="h-4 w-4 text-red-600 dark:text-red-400 shrink-0" />
+                <div>
+                  <span className="font-semibold">Recipient is Suppressed:</span>{" "}
+                  <span className="font-mono font-bold">{suppressionInfo.suppressedEmail}</span> previously{" "}
+                  {suppressionInfo.reason === "hard_bounce" ? "hard-bounced" : "filed a spam complaint"}. Outbound sending is blocked to protect your domain reputation.
+                </div>
+              </div>
+            )}
 
             {/* CC field (collapsible) */}
             {showCc && (
@@ -254,46 +303,44 @@ export function ComposeForm({ senders }: { senders: SenderIdentity[] }) {
                 value={subject}
                 onChange={(e) => setSubject(e.target.value)}
                 placeholder="What is this email about?"
-                className="flex-1 bg-transparent text-sm font-medium text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none"
+                className="flex-1 bg-transparent text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none"
               />
             </div>
           </div>
 
-          {/* Write / Preview Tab Switcher */}
-          <div className="flex items-center justify-between px-4 py-2 border-t border-b border-zinc-200 dark:border-zinc-800 bg-zinc-50 dark:bg-zinc-950/50">
-            <div className="flex items-center gap-1">
+          {/* Editor Header / Tabs */}
+          <div className="flex items-center justify-between px-4 py-2 bg-zinc-50 dark:bg-zinc-900/50 border-t border-b border-zinc-200 dark:border-zinc-800 text-xs">
+            <div className="flex items-center gap-1 bg-zinc-200/60 dark:bg-zinc-800 p-0.5 rounded-lg">
               <button
                 type="button"
                 onClick={() => setActiveTab("write")}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-md transition-all ${
                   activeTab === "write"
-                    ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-white"
-                    : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200"
+                    ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-sm font-semibold"
+                    : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
                 }`}
               >
                 <Edit3 className="h-3.5 w-3.5" />
-                Write
+                <span>Write</span>
               </button>
               <button
                 type="button"
                 onClick={() => setActiveTab("preview")}
-                className={`inline-flex items-center gap-1.5 px-3 py-1.5 rounded-md text-xs font-medium transition-colors ${
+                className={`flex items-center gap-1.5 px-3 py-1 rounded-md transition-all ${
                   activeTab === "preview"
-                    ? "bg-white text-zinc-900 shadow-sm dark:bg-zinc-800 dark:text-white"
-                    : "text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-200"
+                    ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-sm font-semibold"
+                    : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
                 }`}
               >
                 <Eye className="h-3.5 w-3.5" />
-                Preview
+                <span>Preview</span>
               </button>
             </div>
-            <span className="text-xs text-zinc-400">
-              Plain text & HTML supported
-            </span>
+            <span className="text-zinc-400">Plain text & HTML supported</span>
           </div>
 
-          {/* Editor Area */}
-          <div className="p-4 min-h-[300px]">
+          {/* Body Area */}
+          <div className="p-4">
             {activeTab === "write" ? (
               <textarea
                 value={body}
@@ -329,13 +376,18 @@ export function ComposeForm({ senders }: { senders: SenderIdentity[] }) {
           </div>
           <button
             type="submit"
-            disabled={isPending || !to.trim()}
+            disabled={isPending || !to.trim() || suppressionInfo.isSuppressed}
             className="inline-flex items-center gap-2 px-6 py-2.5 bg-black text-white dark:bg-white dark:text-black rounded-lg text-sm font-medium hover:opacity-90 disabled:opacity-50 disabled:cursor-not-allowed transition-all shadow-sm"
           >
             {isPending ? (
               <>
                 <Loader2 className="h-4 w-4 animate-spin" />
                 <span>Sending...</span>
+              </>
+            ) : suppressionInfo.isSuppressed ? (
+              <>
+                <ShieldAlert className="h-4 w-4 text-red-400" />
+                <span>Recipient Suppressed</span>
               </>
             ) : (
               <>

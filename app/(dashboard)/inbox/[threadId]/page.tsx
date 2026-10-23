@@ -1,7 +1,7 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { threads, messages } from "@/lib/db/schema";
+import { threads, messages, suppressions } from "@/lib/db/schema";
 import { eq, asc } from "drizzle-orm";
 import { ThreadReplyBox } from "@/components/inbox/ThreadReplyBox";
 import { ThreadLiveRefresher } from "@/components/inbox/ThreadLiveRefresher";
@@ -29,6 +29,12 @@ async function ThreadDetails({
   if (!thread) {
     notFound();
   }
+
+  const [suppressedRecord] = await db
+    .select({ reason: suppressions.reason })
+    .from(suppressions)
+    .where(eq(suppressions.email, thread.contactEmail.toLowerCase()))
+    .limit(1);
 
   const messageList = await db
     .select()
@@ -152,7 +158,12 @@ async function ThreadDetails({
         <h3 className="text-sm font-semibold text-zinc-800 dark:text-zinc-200 mb-3">
           Reply to Conversation
         </h3>
-        <ThreadReplyBox threadId={thread.id} />
+        <ThreadReplyBox
+          threadId={thread.id}
+          contactEmail={thread.contactEmail}
+          isSuppressed={Boolean(suppressedRecord)}
+          suppressionReason={suppressedRecord?.reason || null}
+        />
       </div>
     </div>
   );
