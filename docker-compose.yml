@@ -44,6 +44,18 @@ services:
     networks:
       - email-network
 
+  tunnel:
+    image: cloudflare/cloudflared:latest
+    container_name: email-tool-tunnel
+    restart: unless-stopped
+    command: tunnel run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - web
+    networks:
+      - email-network
+    profiles:
+      - tunnel
+
 volumes:
   postgres_data:
     driver: local
