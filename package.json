@@ -5,8 +5,11 @@
   "scripts": {
     "dev": "next dev",
     "dev:all": "docker compose up -d postgres && npx concurrently -k -n \"next,tunnel\" -c \"cyan,magenta\" \"next dev\" \"npx wait-on tcp:3000 && cloudflared tunnel --url http://localhost:3000\"",
+    "db:run": "docker run --name email-tool-postgres -e POSTGRES_USER=postgres -e POSTGRES_PASSWORD=postgres -e POSTGRES_DB=email_tool -p 5432:5432 -v postgres_data:/var/lib/postgresql/data --restart unless-stopped -d docker.io/library/postgres:16-alpine",
     "db:start": "docker compose up -d postgres",
     "db:stop": "docker compose stop postgres",
+    "db:push": "drizzle-kit push",
+    "db:studio": "drizzle-kit studio",
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:build": "docker compose build",
