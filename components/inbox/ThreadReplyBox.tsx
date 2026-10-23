@@ -2,13 +2,21 @@
 
 import { useState, useTransition } from "react";
 import { replyAction } from "@/app/(dashboard)/inbox/[threadId]/actions";
-import { Send, Loader2, AlertCircle, ShieldAlert } from "lucide-react";
+import { Send, Loader2, AlertCircle, ShieldAlert, Sparkles } from "lucide-react";
+
+interface CannedTemplate {
+  id: string;
+  name: string;
+  slug: string;
+  textBody: string | null;
+}
 
 interface ThreadReplyBoxProps {
   threadId: string;
   contactEmail?: string;
   isSuppressed?: boolean;
   suppressionReason?: string | null;
+  templates?: CannedTemplate[];
 }
 
 export function ThreadReplyBox({
@@ -16,6 +24,7 @@ export function ThreadReplyBox({
   contactEmail,
   isSuppressed = false,
   suppressionReason = null,
+  templates = [],
 }: ThreadReplyBoxProps) {
   const [body, setBody] = useState("");
   const [error, setError] = useState<string | null>(null);
@@ -34,6 +43,21 @@ export function ThreadReplyBox({
         setError(res.error || "Failed to send reply");
       }
     });
+  };
+
+  const handleTemplateInsert = (e: React.ChangeEvent<HTMLSelectElement>) => {
+    const selected = templates.find((t) => t.id === e.target.value);
+    if (selected?.textBody) {
+      const customerName = contactEmail ? contactEmail.split("@")[0] : "there";
+      const filled = selected.textBody
+        .replace(/\{\{\s*customer_name\s*\}\}/g, customerName)
+        .replace(/\{\{\s*company\s*\}\}/g, "SystemDevify")
+        .replace(/\{\{\s*agent_name\s*\}\}/g, "Support Team")
+        .replace(/\{\{\s*ticket_id\s*\}\}/g, threadId.slice(0, 8));
+
+      setBody((prev) => (prev.trim() ? `${prev}\n\n${filled}` : filled));
+    }
+    e.target.value = "";
   };
 
   return (
@@ -62,6 +86,30 @@ export function ThreadReplyBox({
       )}
 
       <form onSubmit={handleReply} className="space-y-3">
+        {/* Quick Canned Template Selector */}
+        {templates.length > 0 && !isSuppressed && (
+          <div className="flex items-center justify-between pb-1">
+            <div className="flex items-center gap-1.5 text-xs text-zinc-500">
+              <Sparkles className="h-3.5 w-3.5 text-amber-500" />
+              <span>Canned Response:</span>
+              <select
+                defaultValue=""
+                onChange={handleTemplateInsert}
+                className="appearance-none bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-0.5 text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white cursor-pointer"
+              >
+                <option value="" disabled>
+                  Insert template...
+                </option>
+                {templates.map((tpl) => (
+                  <option key={tpl.id} value={tpl.id}>
+                    {tpl.name}
+                  </option>
+                ))}
+              </select>
+            </div>
+          </div>
+        )}
+
         <textarea
           rows={4}
           value={body}
@@ -74,6 +122,7 @@ export function ThreadReplyBox({
           }
           className="w-full bg-transparent text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none resize-y font-sans disabled:opacity-50 disabled:cursor-not-allowed"
         />
+
         <div className="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-zinc-800">
           <span className="text-xs text-zinc-400">
             {isSuppressed

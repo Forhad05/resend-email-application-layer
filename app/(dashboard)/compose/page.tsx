@@ -1,11 +1,15 @@
 import { Suspense } from "react";
 import { getSenderIdentities } from "@/lib/email/senders";
+import { getTemplates } from "@/lib/email/templates";
 import { ComposeForm } from "./ComposeForm";
 import { Loader2 } from "lucide-react";
 
 async function ComposeContent() {
-  const senders = await getSenderIdentities();
-  return <ComposeForm senders={senders} />;
+  const [senders, templates] = await Promise.all([
+    getSenderIdentities(),
+    getTemplates(),
+  ]);
+  return <ComposeForm senders={senders} templates={templates} />;
 }
 
 export default function ComposePage() {

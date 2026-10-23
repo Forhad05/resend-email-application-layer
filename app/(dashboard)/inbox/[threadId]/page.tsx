@@ -1,14 +1,29 @@
 import { Suspense } from "react";
 import { notFound } from "next/navigation";
 import { db } from "@/lib/db";
-import { threads, messages, suppressions, internalNotes, user } from "@/lib/db/schema";
-import { eq, asc } from "drizzle-orm";
+import {
+  threads,
+  messages,
+  suppressions,
+  internalNotes,
+  user,
+  attachments,
+} from "@/lib/db/schema";
+import { eq, asc, inArray } from "drizzle-orm";
 import { getTeamMembers } from "@/lib/db/team";
+import { getTemplates } from "@/lib/email/templates";
 import { ThreadComposerTabs } from "@/components/inbox/ThreadComposerTabs";
 import { ThreadLiveRefresher } from "@/components/inbox/ThreadLiveRefresher";
 import { ThreadWorkflowControls } from "@/components/inbox/ThreadWorkflowControls";
 import { DeliveryStatusBadge } from "@/components/inbox/DeliveryStatusBadge";
-import { ArrowLeft, Clock, ShieldCheck, Lock } from "lucide-react";
+import {
+  ArrowLeft,
+  Clock,
+  ShieldCheck,
+  Lock,
+  Paperclip,
+  Download,
+} from "lucide-react";
 import Link from "next/link";
 
 interface PageProps {
@@ -61,13 +76,31 @@ async function ThreadDetails({
     .where(eq(suppressions.email, thread.contactEmail.toLowerCase()))
     .limit(1);
 
-  const teamMembers = await getTeamMembers();
+  const [teamMembers, templateList, messageList] = await Promise.all([
+    getTeamMembers(),
+    getTemplates(),
+    db
+      .select()
+      .from(messages)
+      .where(eq(messages.threadId, threadId))
+      .orderBy(asc(messages.createdAt)),
+  ]);
 
-  const messageList = await db
-    .select()
-    .from(messages)
-    .where(eq(messages.threadId, threadId))
-    .orderBy(asc(messages.createdAt));
+  const messageIds = messageList.map((m) => m.id);
+  const attachmentList =
+    messageIds.length > 0
+      ? await db
+          .select()
+          .from(attachments)
+          .where(inArray(attachments.messageId, messageIds))
+      : [];
+
+  const attachmentMap = new Map<string, typeof attachmentList>();
+  for (const att of attachmentList) {
+    const existing = attachmentMap.get(att.messageId) || [];
+    existing.push(att);
+    attachmentMap.set(att.messageId, existing);
+  }
 
   const noteList = await db
     .select({
@@ -205,6 +238,8 @@ async function ThreadDetails({
           }
 
           const isOutbound = item.direction === "outbound";
+          const messageAttachments = attachmentMap.get(item.id) || [];
+
           return (
             <div
               key={item.id}
@@ -248,6 +283,45 @@ async function ThreadDetails({
                 {item.textBody || item.htmlBody || "(No content)"}
               </div>
 
+              {/* Attachments Section */}
+              {messageAttachments.length > 0 && (
+                <div className="mt-3 pt-3 border-t border-zinc-100 dark:border-zinc-800/80">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-zinc-600 dark:text-zinc-400 mb-2">
+                    <Paperclip className="h-3.5 w-3.5 text-zinc-400" />
+                    <span>Attachments ({messageAttachments.length})</span>
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    {messageAttachments.map((att) => (
+                      <div
+                        key={att.id}
+                        className="inline-flex items-center gap-2 px-3 py-1.5 rounded-lg border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800/60 text-xs"
+                      >
+                        <Paperclip className="h-3 w-3 text-zinc-400 shrink-0" />
+                        <span className="font-medium text-zinc-800 dark:text-zinc-200 truncate max-w-[160px]">
+                          {att.filename}
+                        </span>
+                        {att.sizeBytes && (
+                          <span className="text-[10px] text-zinc-400">
+                            ({(att.sizeBytes / 1024).toFixed(1)} KB)
+                          </span>
+                        )}
+                        {att.resendUrl && (
+                          <a
+                            href={att.resendUrl}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="text-blue-600 dark:text-blue-400 hover:underline inline-flex items-center gap-0.5 ml-1"
+                          >
+                            <Download className="h-3 w-3" />
+                            <span>Download</span>
+                          </a>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              )}
+
               {/* Status footer for outbound messages */}
               {isOutbound && (
                 <div className="mt-3 pt-2 flex items-center justify-between text-[11px] text-zinc-400 border-t border-zinc-100 dark:border-zinc-800/60">
@@ -270,13 +344,19 @@ async function ThreadDetails({
         })}
       </div>
 
-      {/* Dual Composer: Reply to Customer OR Write Internal Note */}
+      {/* Dual Composer: Reply to Customer OR Write Internal Note with Quick Canned Templates */}
       <div className="pt-2">
         <ThreadComposerTabs
           threadId={thread.id}
           contactEmail={thread.contactEmail}
           isSuppressed={Boolean(suppressedRecord)}
           suppressionReason={suppressedRecord?.reason || null}
+          templates={templateList.map((t) => ({
+            id: t.id,
+            name: t.name,
+            slug: t.slug,
+            textBody: t.textBody,
+          }))}
         />
       </div>
     </div>

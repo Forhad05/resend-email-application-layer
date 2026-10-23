@@ -5,11 +5,19 @@ import { ThreadReplyBox } from "@/components/inbox/ThreadReplyBox";
 import { InternalNoteBox } from "@/components/inbox/InternalNoteBox";
 import { MessageSquare, Lock } from "lucide-react";
 
+interface CannedTemplate {
+  id: string;
+  name: string;
+  slug: string;
+  textBody: string | null;
+}
+
 interface ThreadComposerTabsProps {
   threadId: string;
   contactEmail: string;
   isSuppressed: boolean;
   suppressionReason: string | null;
+  templates?: CannedTemplate[];
 }
 
 export function ThreadComposerTabs({
@@ -17,6 +25,7 @@ export function ThreadComposerTabs({
   contactEmail,
   isSuppressed,
   suppressionReason,
+  templates = [],
 }: ThreadComposerTabsProps) {
   const [activeTab, setActiveTab] = useState<"reply" | "note">("reply");
 
@@ -66,6 +75,7 @@ export function ThreadComposerTabs({
           contactEmail={contactEmail}
           isSuppressed={isSuppressed}
           suppressionReason={suppressionReason}
+          templates={templates}
         />
       ) : (
         <InternalNoteBox threadId={threadId} />
@@ -73,4 +83,3 @@ export function ThreadComposerTabs({
     </div>
   );
 }
-

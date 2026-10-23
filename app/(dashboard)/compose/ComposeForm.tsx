@@ -13,6 +13,7 @@ import {
   ChevronDown,
   Settings2,
   ShieldAlert,
+  Sparkles,
 } from "lucide-react";
 import Link from "next/link";
 
@@ -24,7 +25,20 @@ interface SenderIdentity {
   isDefault: boolean;
 }
 
-export function ComposeForm({ senders }: { senders: SenderIdentity[] }) {
+interface CannedTemplate {
+  id: string;
+  name: string;
+  subject: string;
+  textBody: string | null;
+}
+
+export function ComposeForm({
+  senders,
+  templates = [],
+}: {
+  senders: SenderIdentity[];
+  templates?: CannedTemplate[];
+}) {
   const router = useRouter();
   const [isPending, startTransition] = useTransition();
 
@@ -335,7 +349,47 @@ export function ComposeForm({ senders }: { senders: SenderIdentity[] }) {
                 <span>Preview</span>
               </button>
             </div>
-            <span className="text-zinc-400">Plain text & HTML supported</span>
+
+            <div className="flex items-center gap-2">
+              {templates.length > 0 && (
+                <div className="flex items-center gap-1.5 text-zinc-500">
+                  <Sparkles className="h-3 w-3 text-amber-500" />
+                  <select
+                    defaultValue=""
+                    onChange={(e) => {
+                      const tpl = templates.find((t) => t.id === e.target.value);
+                      if (tpl) {
+                        const custName = to.trim() ? to.split("@")[0] : "Customer";
+                        const filledSubject = tpl.subject
+                          .replace(/\{\{\s*customer_name\s*\}\}/g, custName)
+                          .replace(/\{\{\s*company\s*\}\}/g, "SystemDevify")
+                          .replace(/\{\{\s*ticket_id\s*\}\}/g, "NEW");
+                        const filledBody = (tpl.textBody || "")
+                          .replace(/\{\{\s*customer_name\s*\}\}/g, custName)
+                          .replace(/\{\{\s*company\s*\}\}/g, "SystemDevify")
+                          .replace(/\{\{\s*agent_name\s*\}\}/g, "Support Team")
+                          .replace(/\{\{\s*ticket_id\s*\}\}/g, "NEW");
+
+                        setSubject(filledSubject);
+                        setBody(filledBody);
+                      }
+                      e.target.value = "";
+                    }}
+                    className="appearance-none bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-0.5 text-xs text-zinc-700 dark:text-zinc-300 focus:outline-none cursor-pointer"
+                  >
+                    <option value="" disabled>
+                      Insert Template...
+                    </option>
+                    {templates.map((tpl) => (
+                      <option key={tpl.id} value={tpl.id}>
+                        {tpl.name}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+              <span className="text-zinc-400 hidden sm:inline">Plain text & HTML</span>
+            </div>
           </div>
 
           {/* Body Area */}
