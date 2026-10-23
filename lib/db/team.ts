@@ -4,20 +4,20 @@ import { user } from "@/lib/db/schema";
 export const DEFAULT_TEAM_MEMBERS = [
   {
     id: "user_apon_01",
-    name: "Mahafuzul Haq (Apon)",
-    email: "mahafuzul@mail.systemdevify.com",
+    name: "Admin User",
+    email: "admin@yourdomain.com",
     role: "admin",
   },
   {
     id: "user_sarah_02",
     name: "Sarah Jenkins",
-    email: "support@mail.systemdevify.com",
+    email: "support@yourdomain.com",
     role: "agent",
   },
   {
     id: "user_alex_03",
     name: "Alex Rivera",
-    email: "contracts@mail.systemdevify.com",
+    email: "agent@yourdomain.com",
     role: "agent",
   },
 ];

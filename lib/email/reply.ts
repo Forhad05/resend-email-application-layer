@@ -63,7 +63,7 @@ export async function replyToThread({
     }
 
     if (!senderAddress) {
-      senderAddress = process.env.EMAIL_FROM || "Support <support@mail.systemdevify.com>";
+      senderAddress = process.env.EMAIL_FROM || "Support <support@yourdomain.com>";
     }
 
     const subject = thread.subject.startsWith("Re:")

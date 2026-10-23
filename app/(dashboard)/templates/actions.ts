@@ -87,7 +87,7 @@ export async function sendTestTemplateEmailAction(templateSlug: string, toEmail:
     variables: {
       customer_name: "Valued Customer",
       ticket_id: "TICK-9021",
-      reset_link: "https://mail.systemdevify.com/auth/reset-password?token=example_test_token",
+      reset_link: "https://yourdomain.com/auth/reset-password?token=example_test_token",
     },
   });
 }

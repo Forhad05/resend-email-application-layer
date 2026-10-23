@@ -112,8 +112,8 @@ export const senderIdentities = pgTable(
   {
     id: uuid("id").primaryKey().defaultRandom(),
     name: text("name").notNull(), // e.g. "Contracts", "Support", "Mahafuzul"
-    email: text("email").notNull().unique(), // e.g. "contracts@mail.systemdevify.com"
-    domain: text("domain").notNull(), // e.g. "mail.systemdevify.com"
+    email: text("email").notNull().unique(), // e.g. "contracts@mail.yourdomain.com"
+    domain: text("domain").notNull(), // e.g. "mail.yourdomain.com"
     isDefault: boolean("is_default").notNull().default(false),
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()

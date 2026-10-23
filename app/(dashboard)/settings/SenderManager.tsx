@@ -47,7 +47,7 @@ export function SenderManager({
   const [name, setName] = useState("");
   const [prefix, setPrefix] = useState("");
   const [selectedDomain, setSelectedDomain] = useState(
-    domains.length > 0 ? domains[0].name : "mail.systemdevify.com"
+    domains.length > 0 ? domains[0].name : "yourdomain.com"
   );
   const [isDefault, setIsDefault] = useState(false);
 
@@ -250,10 +250,7 @@ export function SenderManager({
                       </option>
                     ))}
                     {domains.length === 0 && (
-                      <>
-                        <option value="mail.systemdevify.com">mail.systemdevify.com</option>
-                        <option value="outbound.systemdevify.com">outbound.systemdevify.com</option>
-                      </>
+                      <option value="yourdomain.com">yourdomain.com (Verify domain in Resend)</option>
                     )}
                   </select>
                 </div>

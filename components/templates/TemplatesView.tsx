@@ -152,12 +152,12 @@ export function TemplatesView({ initialTemplates }: TemplatesViewProps) {
 
   // Sample interpolated variables for preview
   const sampleVariables = {
-    customer_name: "Mahafuzul Haq",
-    company: "SystemDevify",
+    customer_name: "Jane Doe",
+    company: "Acme Corp",
     ticket_id: "TICK-4029",
     agent_name: "Sarah Jenkins",
-    support_email: "support@mail.systemdevify.com",
-    reset_link: "https://mail.systemdevify.com/auth/reset?token=demo_token_123",
+    support_email: "support@yourdomain.com",
+    reset_link: "https://yourdomain.com/auth/reset?token=demo_token_123",
   };
 
   return (

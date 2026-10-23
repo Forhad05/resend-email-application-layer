@@ -75,15 +75,15 @@ export async function sendTransactionalEmail({
       if (defaultIdentity) {
         sender = `${defaultIdentity.name} <${defaultIdentity.email}>`;
       } else {
-        sender = process.env.EMAIL_FROM || "Support <support@mail.systemdevify.com>";
+        sender = process.env.EMAIL_FROM || "Support <support@yourdomain.com>";
       }
     }
 
     // 4. Default interpolation variables
     const finalVariables: Record<string, string> = {
       customer_name: primaryRecipient.split("@")[0],
-      company: "SystemDevify",
-      support_email: "support@mail.systemdevify.com",
+      company: process.env.NEXT_PUBLIC_APP_NAME || "Support",
+      support_email: process.env.EMAIL_FROM || "support@yourdomain.com",
       ...variables,
     };
 
