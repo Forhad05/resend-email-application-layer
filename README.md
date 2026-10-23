@@ -22,6 +22,9 @@
   - [4. Ticket Workflows & Team Collaboration State Machine](#4-ticket-workflows--team-collaboration-state-machine)
   - [5. Transactional Engine & Variable Interpolation](#5-transactional-engine--variable-interpolation)
   - [6. Relational Database Entity-Relationship Blueprint (ERD)](#6-relational-database-entity-relationship-blueprint-erd)
+- [🗄️ Database Schema (PostgreSQL DDL)](#️-database-schema-postgresql-ddl)
+  - [Core Support & Email Tables](#core-support--email-tables)
+  - [Authentication Tables (Better Auth)](#authentication-tables-better-auth)
 - [🏗️ Directory & Module Architecture](#️-directory--module-architecture)
 - [🚀 Getting Started](#-getting-started)
 - [🛠️ Available Scripts](#️-available-scripts)
@@ -515,6 +518,222 @@ erDiagram
         timestamp created_at
         timestamp updated_at
     }
+```
+
+---
+
+## 🗄️ Database Schema (PostgreSQL DDL)
+
+The application manages data through **Drizzle ORM** targeting **PostgreSQL 16**. Below is the complete SQL DDL schema corresponding to [`lib/db/schema.ts`](lib/db/schema.ts):
+
+### Core Support & Email Tables
+
+```sql
+-- Sender identities / mailboxes across verified domains
+CREATE TABLE sender_identities (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name            TEXT NOT NULL,
+  email           TEXT NOT NULL UNIQUE,
+  domain          TEXT NOT NULL,
+  is_default      BOOLEAN NOT NULL DEFAULT false,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_sender_identities_email ON sender_identities(email);
+CREATE INDEX idx_sender_identities_domain ON sender_identities(domain);
+
+-- Contacts (external customers)
+CREATE TABLE contacts (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email           TEXT NOT NULL UNIQUE,
+  name            TEXT,
+  company         TEXT,
+  phone           TEXT,
+  metadata        JSONB DEFAULT '{}',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_contacts_email ON contacts(email);
+
+-- Threads (conversations)
+CREATE TABLE threads (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  subject         TEXT NOT NULL,
+  status          TEXT NOT NULL DEFAULT 'open' 
+                  CHECK (status IN ('open', 'pending', 'resolved', 'closed')),
+  priority        TEXT NOT NULL DEFAULT 'normal' 
+                  CHECK (priority IN ('low', 'normal', 'high', 'urgent')),
+  assigned_to     TEXT REFERENCES "user"(id) ON DELETE SET NULL,
+  contact_id      UUID REFERENCES contacts(id) ON DELETE SET NULL,
+  contact_email   TEXT NOT NULL,
+  message_count   INTEGER NOT NULL DEFAULT 0,
+  last_message_at TIMESTAMPTZ,
+  is_read         BOOLEAN NOT NULL DEFAULT false,
+  labels          TEXT[] DEFAULT '{}',
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_threads_status ON threads(status);
+CREATE INDEX idx_threads_assigned_to ON threads(assigned_to);
+CREATE INDEX idx_threads_last_message_at ON threads(last_message_at DESC);
+CREATE INDEX idx_threads_contact_email ON threads(contact_email);
+
+-- Messages (inbound and outbound emails)
+CREATE TABLE messages (
+  id                UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  thread_id         UUID NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+  direction         TEXT NOT NULL CHECK (direction IN ('inbound', 'outbound')),
+  message_id        TEXT,
+  in_reply_to       TEXT,
+  references_header TEXT,
+  resend_email_id   TEXT,
+  from_email        TEXT NOT NULL,
+  from_name         TEXT,
+  to_emails         TEXT[] NOT NULL,
+  cc_emails         TEXT[] DEFAULT '{}',
+  bcc_emails        TEXT[] DEFAULT '{}',
+  reply_to          TEXT,
+  subject           TEXT,
+  html_body         TEXT,
+  text_body         TEXT,
+  status            TEXT NOT NULL DEFAULT 'received'
+                    CHECK (status IN (
+                      'received', 'queued', 'sent', 'delivered', 
+                      'opened', 'clicked', 'bounced', 'complained', 'failed'
+                    )),
+  has_attachments   BOOLEAN NOT NULL DEFAULT false,
+  is_draft          BOOLEAN NOT NULL DEFAULT false,
+  sent_by           TEXT REFERENCES "user"(id) ON DELETE SET NULL,
+  created_at        TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at        TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_messages_thread_id ON messages(thread_id);
+CREATE INDEX idx_messages_message_id ON messages(message_id);
+CREATE INDEX idx_messages_resend_email_id ON messages(resend_email_id);
+CREATE INDEX idx_messages_created_at ON messages(created_at);
+CREATE INDEX idx_messages_status ON messages(status);
+
+-- Attachments
+CREATE TABLE attachments (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  message_id      UUID NOT NULL REFERENCES messages(id) ON DELETE CASCADE,
+  filename        TEXT NOT NULL,
+  content_type    TEXT,
+  size_bytes      INTEGER,
+  storage_path    TEXT,
+  resend_url      TEXT,
+  content_id      TEXT,
+  is_inline       BOOLEAN NOT NULL DEFAULT false,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_attachments_message_id ON attachments(message_id);
+
+-- Suppressions blocklist
+CREATE TABLE suppressions (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  email           TEXT NOT NULL UNIQUE,
+  reason          TEXT NOT NULL CHECK (reason IN (
+                    'hard_bounce', 'complaint', 'manual', 'unsubscribe'
+                  )),
+  source          TEXT,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_suppressions_email ON suppressions(email);
+
+-- Reusable templates
+CREATE TABLE templates (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  name            TEXT NOT NULL,
+  slug            TEXT NOT NULL UNIQUE,
+  subject         TEXT NOT NULL,
+  description     TEXT,
+  html_body       TEXT,
+  text_body       TEXT,
+  is_active       BOOLEAN NOT NULL DEFAULT true,
+  created_by      TEXT REFERENCES "user"(id) ON DELETE SET NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_templates_slug ON templates(slug);
+
+-- Internal private team notes
+CREATE TABLE internal_notes (
+  id              UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  thread_id       UUID NOT NULL REFERENCES threads(id) ON DELETE CASCADE,
+  author_id       TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  content         TEXT NOT NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_internal_notes_thread_id ON internal_notes(thread_id);
+```
+
+### Authentication Tables (Better Auth)
+
+```sql
+CREATE TABLE "user" (
+  id              TEXT PRIMARY KEY,
+  name            TEXT NOT NULL,
+  email           TEXT NOT NULL UNIQUE,
+  email_verified  BOOLEAN NOT NULL DEFAULT false,
+  image           TEXT,
+  role            TEXT NOT NULL DEFAULT 'agent' CHECK (role IN ('admin', 'agent')),
+  is_active       BOOLEAN NOT NULL DEFAULT true,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_user_email ON "user"(email);
+
+CREATE TABLE "session" (
+  id              TEXT PRIMARY KEY,
+  expires_at      TIMESTAMPTZ NOT NULL,
+  token           TEXT NOT NULL UNIQUE,
+  ip_address      TEXT,
+  user_agent      TEXT,
+  user_id         TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_session_user_id ON "session"(user_id);
+
+CREATE TABLE "account" (
+  id                      TEXT PRIMARY KEY,
+  account_id              TEXT NOT NULL,
+  provider_id             TEXT NOT NULL,
+  user_id                 TEXT NOT NULL REFERENCES "user"(id) ON DELETE CASCADE,
+  access_token            TEXT,
+  refresh_token           TEXT,
+  id_token                TEXT,
+  access_token_expires_at TIMESTAMPTZ,
+  refresh_token_expires_at TIMESTAMPTZ,
+  scope                   TEXT,
+  password                TEXT,
+  created_at              TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at              TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_account_user_id ON "account"(user_id);
+
+CREATE TABLE "verification" (
+  id              TEXT PRIMARY KEY,
+  identifier      TEXT NOT NULL,
+  value           TEXT NOT NULL,
+  expires_at      TIMESTAMPTZ NOT NULL,
+  created_at      TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at      TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+CREATE INDEX idx_verification_identifier ON "verification"(identifier);
 ```
 
 ---
