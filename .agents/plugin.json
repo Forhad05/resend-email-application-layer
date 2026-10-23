@@ -1,0 +1,12 @@
+{
+  "name": "obsidian",
+  "displayName": "Obsidian",
+  "description": "Obsidian vault integration via Model Context Protocol (MCP) to search, read, create, and update notes.",
+  "version": "1.0.0",
+  "suggestedPrompts": [
+    "Search my Obsidian vault for notes relevant to this project",
+    "Read the active note or daily note from Obsidian",
+    "Append project notes and decisions to Obsidian"
+  ]
+}
+

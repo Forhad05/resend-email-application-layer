@@ -38,7 +38,6 @@ yarn-error.log*
 .vercel
 
 # local agent and ide configs
-.agents/
 .idea/
 .vscode/
 
