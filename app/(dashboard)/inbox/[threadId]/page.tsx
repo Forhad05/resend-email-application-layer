@@ -25,6 +25,7 @@ import {
   Download,
 } from "lucide-react";
 import Link from "next/link";
+import { connection } from "next/server";
 
 interface PageProps {
   params: Promise<{ threadId: string }>;
@@ -58,6 +59,7 @@ async function ThreadDetails({
 }: {
   params: Promise<{ threadId: string }>;
 }) {
+  await connection();
   const { threadId } = await params;
 
   const [thread] = await db

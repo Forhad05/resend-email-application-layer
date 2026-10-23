@@ -1,5 +1,6 @@
 import { db } from "@/lib/db";
 import { user } from "@/lib/db/schema";
+import { connection } from "next/server";
 
 export const DEFAULT_TEAM_MEMBERS = [
   {
@@ -23,6 +24,7 @@ export const DEFAULT_TEAM_MEMBERS = [
 ];
 
 export async function getTeamMembers() {
+  await connection();
   try {
     const existing = await db.select().from(user);
     if (existing.length > 0) {

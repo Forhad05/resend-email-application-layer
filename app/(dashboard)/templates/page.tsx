@@ -1,8 +1,10 @@
 import { Suspense } from "react";
 import { getTemplates } from "@/lib/email/templates";
 import { TemplatesView } from "@/components/templates/TemplatesView";
+import { connection } from "next/server";
 
 async function TemplateLoader() {
+  await connection();
   const templateList = await getTemplates();
   return <TemplatesView initialTemplates={templateList} />;
 }

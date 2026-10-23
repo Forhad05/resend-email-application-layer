@@ -3,8 +3,10 @@ import { db } from "@/lib/db";
 import { messages, threads, suppressions } from "@/lib/db/schema";
 import { sql } from "drizzle-orm";
 import { Mail, MessageSquare, ShieldAlert } from "lucide-react";
+import { connection } from "next/server";
 
 async function StatsGrid() {
+  await connection();
   const [msgCount] = await db
     .select({ count: sql<number>`count(*)::int` })
     .from(messages);

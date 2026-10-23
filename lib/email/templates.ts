@@ -1,6 +1,7 @@
 import { db } from "@/lib/db";
 import { templates } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import { connection } from "next/server";
 import { interpolateTemplate, TemplateVariableMap } from "./template-utils";
 
 export { interpolateTemplate, type TemplateVariableMap };
@@ -117,6 +118,7 @@ The {{company}} Security Team`,
  * Retrieves all templates from the database, auto-seeding defaults if the table is empty.
  */
 export async function getTemplates() {
+  await connection();
   try {
     const existing = await db.select().from(templates);
     if (existing.length > 0) {

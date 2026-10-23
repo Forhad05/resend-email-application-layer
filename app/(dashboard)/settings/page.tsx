@@ -2,8 +2,10 @@ import { Suspense } from "react";
 import { getSenderIdentities, getResendDomains } from "@/lib/email/senders";
 import { SenderManager } from "./SenderManager";
 import { Key, Server, Shield, Globe, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
+import { connection } from "next/server";
 
 async function SettingsContent() {
+  await connection();
   const [senders, domains] = await Promise.all([
     getSenderIdentities(),
     getResendDomains(),

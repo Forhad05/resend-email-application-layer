@@ -6,8 +6,10 @@ import { Plus } from "lucide-react";
 import Link from "next/link";
 import { InboxThreadView } from "@/components/inbox/InboxThreadView";
 import { getTeamMembers } from "@/lib/db/team";
+import { connection } from "next/server";
 
 async function ThreadList() {
+  await connection();
   const [threadList, teamMembers] = await Promise.all([
     db
       .select({

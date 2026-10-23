@@ -2,8 +2,10 @@ import { db } from "@/lib/db";
 import { senderIdentities } from "@/lib/db/schema";
 import { resend } from "@/lib/resend";
 import { asc, eq } from "drizzle-orm";
+import { connection } from "next/server";
 
 export async function getSenderIdentities() {
+  await connection();
   return await db
     .select()
     .from(senderIdentities)

@@ -3,8 +3,10 @@ import { db } from "@/lib/db";
 import { contacts, threads } from "@/lib/db/schema";
 import { desc, count } from "drizzle-orm";
 import { ContactsView, ContactData } from "@/components/contacts/ContactsView";
+import { connection } from "next/server";
 
 async function ContactList() {
+  await connection();
   const [contactList, threadCounts] = await Promise.all([
     db
       .select({
