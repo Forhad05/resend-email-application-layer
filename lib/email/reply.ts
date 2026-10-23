@@ -47,9 +47,25 @@ export async function replyToThread({
       };
     }
 
-    // 3. Sender & Subject
-    const defaultSender =
-      process.env.EMAIL_FROM || "Support <onboarding@resend.dev>";
+    // 3. Resolve Sender Address
+    let senderAddress: string | null = null;
+
+    // Check if there was an earlier outbound message from this thread
+    const priorOutbound = previousMessages.find((m) => m.direction === "outbound" && m.fromEmail);
+    if (priorOutbound?.fromEmail) {
+      senderAddress = priorOutbound.fromEmail;
+    } else {
+      // If it started from an inbound message, check which of our mailboxes it was sent to
+      const priorInbound = previousMessages.find((m) => m.direction === "inbound" && m.toEmails?.length > 0);
+      if (priorInbound?.toEmails?.[0]) {
+        senderAddress = priorInbound.toEmails[0];
+      }
+    }
+
+    if (!senderAddress) {
+      senderAddress = process.env.EMAIL_FROM || "Support <support@mail.systemdevify.com>";
+    }
+
     const subject = thread.subject.startsWith("Re:")
       ? thread.subject
       : `Re: ${thread.subject}`;
@@ -76,7 +92,7 @@ export async function replyToThread({
     }
 
     const { data: resendData, error: resendError } = await resend.emails.send({
-      from: defaultSender,
+      from: senderAddress,
       to: [thread.contactEmail],
       subject,
       text: body,
@@ -106,7 +122,7 @@ export async function replyToThread({
         threadId: thread.id,
         direction: "outbound",
         resendEmailId: resendData?.id,
-        fromEmail: defaultSender,
+        fromEmail: senderAddress,
         toEmails: [thread.contactEmail],
         subject,
         textBody: body,

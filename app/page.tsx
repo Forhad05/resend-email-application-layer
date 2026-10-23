@@ -1,5 +1,5 @@
-import { redirect } from "next/navigation";
-
 export default function HomePage() {
-  redirect("/inbox");
+  // Redirect is handled at the router layer in next.config.ts (redirects)
+  return null;
 }
+
