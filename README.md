@@ -30,6 +30,7 @@
 - [🛠️ Available Scripts](#️-available-scripts)
 - [🔒 Security & Reliability Architecture](#-security--reliability-architecture)
 - [📜 License](#-license)
+- [🤲 Zakat & Sadaqah / Support](#-zakat--sadaqah--support)
 
 ---
 
@@ -859,8 +860,7 @@ BETTER_AUTH_URL="http://localhost:3000"
 BETTER_AUTH_SECRET="your_generated_random_secret_here"
 ```
 
-> [!TIP]
-> Generate a cryptographically secure secret for Better Auth via `openssl rand -hex 32`.
+> **Tip:** Generate a cryptographically secure secret for Better Auth via `openssl rand -hex 32`.
 
 ### 4. Database Setup & Docker Execution
 
@@ -941,3 +941,31 @@ Open [http://localhost:3000](http://localhost:3000) in your browser. Default tem
 ## 📜 License
 
 This project is open-source software licensed under the [MIT License](LICENSE).
+
+## 🤲 Zakat & Sadaqah / Support
+
+If this open-source tool has been valuable to you and you'd like to support independent development while I rebuild my venture from scratch, I am eligible to receive **Zakat** and **Sadaqah** under Islamic guidelines.
+
+<!-- markdownlint-disable -->
+<p align="center">
+  <a href="https://app.binance.com/uni-qr/EEW2yX2x" target="_blank" rel="noopener noreferrer">
+    <img src="public/Binance_pay.jpg" alt="Binance Pay QR - Mahafuzul Haque" width="240" />
+  </a>
+  <br />
+  <strong>Payee:</strong> <code>Mahafuzul Haque</code>
+  <br /><br />
+  <a href="https://app.binance.com/uni-qr/EEW2yX2x" target="_blank" rel="noopener noreferrer">
+    <img src="https://img.shields.io/badge/Pay%20via-Binance%20Pay-F0B90B?style=for-the-badge&logo=binance&logoColor=black" alt="Pay via Binance Pay" />
+  </a>
+  <br />
+  <em>Scan with the Binance App or click above to pay directly via Binance Pay</em>
+</p>
+<!-- markdownlint-enable -->
+
+### Direct Payment Link
+
+- **Direct Link:** [https://app.binance.com/uni-qr/EEW2yX2x](https://app.binance.com/uni-qr/EEW2yX2x)
+- **Payee Name:** `Mahafuzul Haque`
+
+> **Note:** *Contributions may originate from halal sources.*
+> **Note:** *May Allah accept your generosity and grant barakah.*
