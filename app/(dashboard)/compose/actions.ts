@@ -5,6 +5,12 @@ import { revalidatePath } from "next/cache";
 import { db } from "@/lib/db";
 import { suppressions } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
+import {
+  processUploadedFile,
+  MAX_ATTACHMENTS_TOTAL_BYTES,
+  formatFileSize,
+  OutboundAttachment,
+} from "@/lib/email/attachments";
 
 export async function sendEmailAction(
   formData: FormData
@@ -37,6 +43,32 @@ export async function sendEmailAction(
         .filter(Boolean)
     : [];
 
+  // Process attachments
+  const rawFiles = formData.getAll("files") as File[];
+  const validFiles = rawFiles.filter(
+    (f) => f && typeof f.size === "number" && f.size > 0 && f.name
+  );
+
+  let totalBytes = 0;
+  for (const f of validFiles) {
+    totalBytes += f.size;
+  }
+
+  if (totalBytes > MAX_ATTACHMENTS_TOTAL_BYTES) {
+    return {
+      success: false,
+      error: `Total attachments size (${formatFileSize(
+        totalBytes
+      )}) exceeds the maximum 25 MB limit.`,
+    };
+  }
+
+  const attachments: OutboundAttachment[] = [];
+  for (const f of validFiles) {
+    const processed = await processUploadedFile(f);
+    attachments.push(processed);
+  }
+
   const result = await sendEmail({
     to,
     from,
@@ -44,6 +76,7 @@ export async function sendEmailAction(
     bcc,
     subject,
     body,
+    attachments,
   });
 
   if (result.success) {

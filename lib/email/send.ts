@@ -1,8 +1,16 @@
 import { resend } from "@/lib/resend";
 import { db } from "@/lib/db";
-import { threads, messages, suppressions, contacts, senderIdentities } from "@/lib/db/schema";
+import {
+  threads,
+  messages,
+  suppressions,
+  contacts,
+  senderIdentities,
+  attachments as attachmentsTable,
+} from "@/lib/db/schema";
 import { inArray, eq } from "drizzle-orm";
 import { checkOutboundRateLimit } from "@/lib/email/rate-limit";
+import { OutboundAttachment } from "@/lib/email/attachments";
 
 export interface SendEmailParams {
   to: string[];
@@ -13,6 +21,7 @@ export interface SendEmailParams {
   bcc?: string[];
   replyTo?: string;
   sentByUserId?: string;
+  attachments?: OutboundAttachment[];
 }
 
 export interface SendEmailResult {
@@ -32,6 +41,7 @@ export async function sendEmail({
   bcc = [],
   replyTo,
   sentByUserId,
+  attachments = [],
 }: SendEmailParams): Promise<SendEmailResult> {
   try {
     // 1. Clean & validate email addresses
@@ -104,6 +114,12 @@ export async function sendEmail({
       };
     }
 
+    const resendAttachments = attachments?.map((att) => ({
+      filename: att.filename,
+      content: att.buffer,
+      contentType: att.contentType,
+    }));
+
     const { data: resendData, error: resendError } = await resend.emails.send({
       from: sender,
       to: cleanedTo,
@@ -116,6 +132,10 @@ export async function sendEmail({
       cc: cc.length > 0 ? cc : undefined,
       bcc: bcc.length > 0 ? bcc : undefined,
       replyTo: replyTo,
+      attachments:
+        resendAttachments && resendAttachments.length > 0
+          ? resendAttachments
+          : undefined,
     });
 
     if (resendError) {
@@ -190,8 +210,24 @@ export async function sendEmail({
         )}</div>`,
         status: "sent",
         sentBy: sentByUserId,
+        hasAttachments: Boolean(attachments && attachments.length > 0),
       })
       .returning({ id: messages.id });
+
+    // 8. Store attachments metadata in database
+    if (attachments && attachments.length > 0) {
+      for (const att of attachments) {
+        await db.insert(attachmentsTable).values({
+          id: att.id,
+          messageId: newMessage.id,
+          filename: att.filename,
+          contentType: att.contentType,
+          sizeBytes: att.sizeBytes,
+          storagePath: att.storagePath,
+          resendUrl: att.downloadUrl,
+        });
+      }
+    }
 
     return {
       success: true,

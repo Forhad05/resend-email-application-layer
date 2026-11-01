@@ -16,6 +16,7 @@ import {
   Sparkles,
 } from "lucide-react";
 import Link from "next/link";
+import { AttachmentUploader } from "@/components/email/AttachmentUploader";
 
 interface SenderIdentity {
   id: string;
@@ -54,6 +55,7 @@ export function ComposeForm({
   const [bcc, setBcc] = useState("");
   const [subject, setSubject] = useState("");
   const [body, setBody] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
 
   const [activeTab, setActiveTab] = useState<"write" | "preview">("write");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
@@ -101,6 +103,10 @@ export function ComposeForm({
     if (showBcc && bcc) formData.append("bcc", bcc);
     formData.append("subject", subject);
     formData.append("body", body);
+
+    for (const file of files) {
+      formData.append("files", file);
+    }
 
     startTransition(async () => {
       const res = await sendEmailAction(formData);
@@ -417,6 +423,11 @@ export function ComposeForm({
               </div>
             )}
           </div>
+        </div>
+
+        {/* Outbound Attachment Uploader */}
+        <div className="pt-1">
+          <AttachmentUploader files={files} onFilesChange={setFiles} />
         </div>
 
         {/* Action Controls */}

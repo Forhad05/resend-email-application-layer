@@ -6,15 +6,67 @@ import { db } from "@/lib/db";
 import { threads, internalNotes } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getTeamMembers } from "@/lib/db/team";
+import {
+  processUploadedFile,
+  MAX_ATTACHMENTS_TOTAL_BYTES,
+  formatFileSize,
+  OutboundAttachment,
+} from "@/lib/email/attachments";
 
-export async function replyAction(threadId: string, body: string) {
+export async function replyAction(
+  threadIdOrFormData: string | FormData,
+  maybeBody?: string,
+  optionalFormData?: FormData
+) {
+  let threadId = "";
+  let body = "";
+  let formData: FormData | null = null;
+
+  if (typeof threadIdOrFormData === "string") {
+    threadId = threadIdOrFormData;
+    body = maybeBody || "";
+    formData = optionalFormData || null;
+  } else {
+    formData = threadIdOrFormData;
+    threadId = (formData.get("threadId") as string) || "";
+    body = (formData.get("body") as string) || "";
+  }
+
   if (!body.trim()) {
     return { success: false, error: "Reply body cannot be empty." };
+  }
+
+  const attachments: OutboundAttachment[] = [];
+  if (formData) {
+    const rawFiles = formData.getAll("files") as File[];
+    const validFiles = rawFiles.filter(
+      (f) => f && typeof f.size === "number" && f.size > 0 && f.name
+    );
+
+    let totalBytes = 0;
+    for (const f of validFiles) {
+      totalBytes += f.size;
+    }
+
+    if (totalBytes > MAX_ATTACHMENTS_TOTAL_BYTES) {
+      return {
+        success: false,
+        error: `Total attachments size (${formatFileSize(
+          totalBytes
+        )}) exceeds the 25 MB limit.`,
+      };
+    }
+
+    for (const f of validFiles) {
+      const processed = await processUploadedFile(f);
+      attachments.push(processed);
+    }
   }
 
   const result = await replyToThread({
     threadId,
     body,
+    attachments: attachments.length > 0 ? attachments : undefined,
   });
 
   if (result.success) {

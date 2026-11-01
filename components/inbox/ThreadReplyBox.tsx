@@ -3,6 +3,7 @@
 import { useState, useTransition } from "react";
 import { replyAction } from "@/app/(dashboard)/inbox/[threadId]/actions";
 import { Send, Loader2, AlertCircle, ShieldAlert, Sparkles } from "lucide-react";
+import { AttachmentUploader } from "@/components/email/AttachmentUploader";
 
 interface CannedTemplate {
   id: string;
@@ -27,6 +28,7 @@ export function ThreadReplyBox({
   templates = [],
 }: ThreadReplyBoxProps) {
   const [body, setBody] = useState("");
+  const [files, setFiles] = useState<File[]>([]);
   const [error, setError] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
 
@@ -35,10 +37,18 @@ export function ThreadReplyBox({
     if (!body.trim() || isSuppressed) return;
     setError(null);
 
+    const formData = new FormData();
+    formData.append("threadId", threadId);
+    formData.append("body", body);
+    for (const file of files) {
+      formData.append("files", file);
+    }
+
     startTransition(async () => {
-      const res = await replyAction(threadId, body);
+      const res = await replyAction(formData);
       if (res.success) {
         setBody("");
+        setFiles([]);
       } else {
         setError(res.error || "Failed to send reply");
       }
@@ -122,6 +132,15 @@ export function ThreadReplyBox({
           }
           className="w-full bg-transparent text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none resize-y font-sans disabled:opacity-50 disabled:cursor-not-allowed"
         />
+
+        {/* Compact Attachment Uploader */}
+        <div className="pt-2">
+          <AttachmentUploader
+            files={files}
+            onFilesChange={setFiles}
+            compact={true}
+          />
+        </div>
 
         <div className="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-zinc-800">
           <span className="text-xs text-zinc-400">

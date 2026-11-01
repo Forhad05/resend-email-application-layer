@@ -1,19 +1,28 @@
 import { resend } from "@/lib/resend";
 import { db } from "@/lib/db";
-import { threads, messages, suppressions, senderIdentities } from "@/lib/db/schema";
+import {
+  threads,
+  messages,
+  suppressions,
+  senderIdentities,
+  attachments as attachmentsTable,
+} from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 import { checkOutboundRateLimit } from "@/lib/email/rate-limit";
+import { OutboundAttachment } from "@/lib/email/attachments";
 
 export interface ReplyEmailParams {
   threadId: string;
   body: string;
   sentByUserId?: string;
+  attachments?: OutboundAttachment[];
 }
 
 export async function replyToThread({
   threadId,
   body,
   sentByUserId,
+  attachments,
 }: ReplyEmailParams) {
   try {
     // 1. Load thread and latest message
@@ -131,6 +140,12 @@ export async function replyToThread({
       };
     }
 
+    const resendAttachments = attachments?.map((att) => ({
+      filename: att.filename,
+      content: att.buffer,
+      contentType: att.contentType,
+    }));
+
     const { data: resendData, error: resendError } = await resend.emails.send({
       from: senderAddress,
       to: [thread.contactEmail],
@@ -146,6 +161,10 @@ export async function replyToThread({
             References: referencesHeader || inReplyTo,
           }
         : undefined,
+      attachments:
+        resendAttachments && resendAttachments.length > 0
+          ? resendAttachments
+          : undefined,
     });
 
     if (resendError) {
@@ -180,10 +199,26 @@ export async function replyToThread({
         referencesHeader: referencesHeader,
         status: "sent",
         sentBy: sentByUserId,
+        hasAttachments: Boolean(attachments && attachments.length > 0),
       })
       .returning({ id: messages.id });
 
-    // 7. Update thread counters
+    // 7. Record attachments in DB
+    if (attachments && attachments.length > 0) {
+      for (const att of attachments) {
+        await db.insert(attachmentsTable).values({
+          id: att.id,
+          messageId: newMessage.id,
+          filename: att.filename,
+          contentType: att.contentType,
+          sizeBytes: att.sizeBytes,
+          storagePath: att.storagePath,
+          resendUrl: att.downloadUrl,
+        });
+      }
+    }
+
+    // 8. Update thread counters
     await db
       .update(threads)
       .set({
