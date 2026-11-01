@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { threads, messages, suppressions, senderIdentities } from "@/lib/db/schema";
 import { eq } from "drizzle-orm";
 import { getTemplateBySlug, interpolateTemplate } from "./templates";
+import { checkTransactionalRateLimit } from "./rate-limit";
 
 export interface SendTransactionalParams {
   to: string | string[];
@@ -54,7 +55,19 @@ export async function sendTransactionalEmail({
       };
     }
 
-    // 2. Fetch template
+    // 2. Transactional Rate Limiting Guard
+    const rateLimitCheck = await checkTransactionalRateLimit({
+      recipient: primaryRecipient,
+      templateSlug,
+    });
+    if (!rateLimitCheck.allowed) {
+      return {
+        success: false,
+        error: rateLimitCheck.reason || "Transactional rate limit exceeded.",
+      };
+    }
+
+    // 3. Fetch template
     const template = await getTemplateBySlug(templateSlug);
     if (!template) {
       return {

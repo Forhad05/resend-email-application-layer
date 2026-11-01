@@ -340,6 +340,20 @@ export const internalNotes = pgTable(
   (table) => [index("idx_internal_notes_thread_id").on(table.threadId)]
 );
 
+// Rate limiting bucket table (sliding window counter for outbound protection)
+export const rateLimits = pgTable(
+  "rate_limits",
+  {
+    key: text("key").primaryKey(),
+    count: integer("count").notNull().default(1),
+    resetAt: timestamp("reset_at", { withTimezone: true }).notNull(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [index("idx_rate_limits_reset_at").on(table.resetAt)]
+);
+
 // ==============================================================================
 // DRIZZLE RELATIONS
 // ==============================================================================

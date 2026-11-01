@@ -2,6 +2,7 @@ import { resend } from "@/lib/resend";
 import { db } from "@/lib/db";
 import { threads, messages, suppressions, senderIdentities } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
+import { checkOutboundRateLimit } from "@/lib/email/rate-limit";
 
 export interface ReplyEmailParams {
   threadId: string;
@@ -47,7 +48,19 @@ export async function replyToThread({
       };
     }
 
-    // 3. Resolve Sender Address safely against registered identities
+    // 3. Outbound Rate Limiting & Flood Guard
+    const rateLimitCheck = await checkOutboundRateLimit({
+      userId: sentByUserId,
+      recipients: [thread.contactEmail],
+    });
+    if (!rateLimitCheck.allowed) {
+      return {
+        success: false,
+        error: rateLimitCheck.reason || "Outbound rate limit exceeded.",
+      };
+    }
+
+    // 4. Resolve Sender Address safely against registered identities
     let senderAddress: string | null = null;
     const identities = await db.select().from(senderIdentities);
     const registeredMap = new Map<string, string>();
