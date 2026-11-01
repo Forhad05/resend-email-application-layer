@@ -6,19 +6,19 @@ export const DEFAULT_TEAM_MEMBERS = [
   {
     id: "user_apon_01",
     name: "Admin User",
-    email: "admin@yourdomain.com",
+    email: "admin@mail.systemdevify.com",
     role: "admin",
   },
   {
     id: "user_sarah_02",
     name: "Sarah Jenkins",
-    email: "support@yourdomain.com",
+    email: "support@mail.systemdevify.com",
     role: "agent",
   },
   {
     id: "user_alex_03",
     name: "Alex Rivera",
-    email: "agent@yourdomain.com",
+    email: "agent@mail.systemdevify.com",
     role: "agent",
   },
 ];

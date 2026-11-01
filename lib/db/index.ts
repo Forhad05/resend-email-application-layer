@@ -12,11 +12,12 @@ const pool =
     connectionString:
       process.env.DATABASE_URL ||
       "postgresql://postgres:postgres@localhost:5432/email_tool",
+    max: 20,
+    idleTimeoutMillis: 30000,
+    connectionTimeoutMillis: 5000,
   });
 
-if (process.env.NODE_ENV !== "production") {
-  globalForDb.pool = pool;
-}
+globalForDb.pool = pool;
 
 export const db = drizzle(pool, { schema });
 export { pool };

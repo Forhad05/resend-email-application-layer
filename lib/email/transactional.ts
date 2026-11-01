@@ -75,7 +75,7 @@ export async function sendTransactionalEmail({
       if (defaultIdentity) {
         sender = `${defaultIdentity.name} <${defaultIdentity.email}>`;
       } else {
-        sender = process.env.EMAIL_FROM || "Support <support@yourdomain.com>";
+        sender = process.env.EMAIL_FROM || "Support <support@mail.systemdevify.com>";
       }
     }
 
@@ -83,7 +83,7 @@ export async function sendTransactionalEmail({
     const finalVariables: Record<string, string> = {
       customer_name: primaryRecipient.split("@")[0],
       company: process.env.NEXT_PUBLIC_APP_NAME || "Support",
-      support_email: process.env.EMAIL_FROM || "support@yourdomain.com",
+      support_email: process.env.EMAIL_FROM || "support@mail.systemdevify.com",
       ...variables,
     };
 
@@ -133,12 +133,17 @@ export async function sendTransactionalEmail({
       })
       .returning();
 
+    const fromMatch = sender.match(/^(?:(.*?)<)?([^<>]+)>?$/);
+    const parsedFromName = fromMatch ? fromMatch[1]?.trim().replace(/^["']|["']$/g, "") || null : null;
+    const parsedFromEmail = fromMatch ? fromMatch[2]?.trim().toLowerCase() : sender.trim().toLowerCase();
+
     const [insertedMsg] = await db
       .insert(messages)
       .values({
         threadId: newThread.id,
         direction: "outbound",
-        fromEmail: sender,
+        fromEmail: parsedFromEmail,
+        fromName: parsedFromName,
         toEmails: toEmails,
         subject: interpolatedSubject,
         textBody: interpolatedText,

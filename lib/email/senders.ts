@@ -6,10 +6,80 @@ import { connection } from "next/server";
 
 export async function getSenderIdentities() {
   await connection();
-  return await db
-    .select()
-    .from(senderIdentities)
-    .orderBy(asc(senderIdentities.name));
+  try {
+    const existing = await db
+      .select()
+      .from(senderIdentities)
+      .orderBy(asc(senderIdentities.name));
+
+    if (existing.length > 0) {
+      return existing;
+    }
+
+    // Auto-seed default sender identities from verified Resend domains
+    const domains = await getResendDomains();
+    const primaryDomain =
+      domains.find((d) => d.sendingEnabled)?.name ||
+      domains[0]?.name ||
+      "mail.systemdevify.com";
+    const secondaryDomain =
+      domains.find((d) => d.name !== primaryDomain)?.name ||
+      "outbound.systemdevify.com";
+
+    const seeds = [
+      {
+        name: "Support",
+        email: `support@${primaryDomain}`.toLowerCase(),
+        domain: primaryDomain,
+        isDefault: true,
+      },
+      {
+        name: "Contracts",
+        email: `contracts@${primaryDomain}`.toLowerCase(),
+        domain: primaryDomain,
+        isDefault: false,
+      },
+      {
+        name: "Billing",
+        email: `billing@${primaryDomain}`.toLowerCase(),
+        domain: primaryDomain,
+        isDefault: false,
+      },
+      {
+        name: "Security",
+        email: `security@${primaryDomain}`.toLowerCase(),
+        domain: primaryDomain,
+        isDefault: false,
+      },
+      {
+        name: "Outbound",
+        email: `hello@${secondaryDomain}`.toLowerCase(),
+        domain: secondaryDomain,
+        isDefault: false,
+      },
+      {
+        name: "Audit",
+        email: `audit@${secondaryDomain}`.toLowerCase(),
+        domain: secondaryDomain,
+        isDefault: false,
+      },
+    ];
+
+    for (const seed of seeds) {
+      await db
+        .insert(senderIdentities)
+        .values(seed)
+        .onConflictDoNothing();
+    }
+
+    return await db
+      .select()
+      .from(senderIdentities)
+      .orderBy(asc(senderIdentities.name));
+  } catch (err) {
+    console.error("Failed to load or seed sender identities:", err);
+    return [];
+  }
 }
 
 export async function getResendDomains() {

@@ -89,6 +89,24 @@ export async function handleInboundEmail(data: ResendInboundPayload) {
           ? parsed.references.join(" ")
           : String(parsed.references);
       }
+      if (parsed.attachments && parsed.attachments.length > 0 && (!data.attachments || data.attachments.length === 0)) {
+        data.attachments = parsed.attachments.map((att) => {
+          let sizeBytes = 0;
+          if (typeof att.content === "string") {
+            sizeBytes = Buffer.byteLength(att.content);
+          } else if (att.content instanceof ArrayBuffer) {
+            sizeBytes = att.content.byteLength;
+          } else if (att.content && typeof (att.content as ArrayBufferView).byteLength === "number") {
+            sizeBytes = (att.content as ArrayBufferView).byteLength;
+          }
+
+          return {
+            filename: att.filename || "attachment",
+            content_type: att.mimeType,
+            size: sizeBytes,
+          };
+        });
+      }
     } catch (parseErr) {
       console.warn("Failed to parse raw MIME email body:", parseErr);
     }

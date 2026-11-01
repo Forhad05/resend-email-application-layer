@@ -1,6 +1,6 @@
 import { resend } from "@/lib/resend";
 import { db } from "@/lib/db";
-import { threads, messages, suppressions, contacts } from "@/lib/db/schema";
+import { threads, messages, suppressions, contacts, senderIdentities } from "@/lib/db/schema";
 import { inArray, eq } from "drizzle-orm";
 
 export interface SendEmailParams {
@@ -57,9 +57,25 @@ export async function sendEmail({
     }
 
     // 3. Determine sender address
-    const defaultSender =
-      process.env.EMAIL_FROM || "Support <onboarding@resend.dev>";
-    const sender = from || defaultSender;
+    let sender = from?.trim();
+    if (!sender) {
+      const [defaultIdent] = await db
+        .select()
+        .from(senderIdentities)
+        .where(eq(senderIdentities.isDefault, true))
+        .limit(1);
+
+      if (defaultIdent) {
+        sender = `${defaultIdent.name} <${defaultIdent.email}>`;
+      } else {
+        const [anyIdent] = await db.select().from(senderIdentities).limit(1);
+        if (anyIdent) {
+          sender = `${anyIdent.name} <${anyIdent.email}>`;
+        } else {
+          sender = process.env.EMAIL_FROM || "Support <support@mail.systemdevify.com>";
+        }
+      }
+    }
 
     // 4. Send via Resend API
     const resendApiKey = process.env.RESEND_API_KEY;
@@ -135,6 +151,11 @@ export async function sendEmail({
       })
       .returning({ id: threads.id });
 
+    // Parse clean sender email and display name
+    const fromMatch = sender.match(/^(?:(.*?)<)?([^<>]+)>?$/);
+    const parsedFromName = fromMatch ? fromMatch[1]?.trim().replace(/^["']|["']$/g, "") || null : null;
+    const parsedFromEmail = fromMatch ? fromMatch[2]?.trim().toLowerCase() : sender.trim().toLowerCase();
+
     // 7. Store Outbound Message record in database
     const [newMessage] = await db
       .insert(messages)
@@ -142,7 +163,8 @@ export async function sendEmail({
         threadId: newThread.id,
         direction: "outbound",
         resendEmailId: resendData?.id,
-        fromEmail: sender,
+        fromEmail: parsedFromEmail,
+        fromName: parsedFromName,
         toEmails: cleanedTo,
         ccEmails: cc,
         bccEmails: bcc,

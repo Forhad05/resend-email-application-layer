@@ -1,6 +1,6 @@
 import { resend } from "@/lib/resend";
 import { db } from "@/lib/db";
-import { threads, messages, suppressions } from "@/lib/db/schema";
+import { threads, messages, suppressions, senderIdentities } from "@/lib/db/schema";
 import { eq, desc } from "drizzle-orm";
 
 export interface ReplyEmailParams {
@@ -47,23 +47,50 @@ export async function replyToThread({
       };
     }
 
-    // 3. Resolve Sender Address
+    // 3. Resolve Sender Address safely against registered identities
     let senderAddress: string | null = null;
+    const identities = await db.select().from(senderIdentities);
+    const registeredMap = new Map<string, string>();
+    for (const ident of identities) {
+      registeredMap.set(ident.email.toLowerCase(), `${ident.name} <${ident.email}>`);
+    }
 
-    // Check if there was an earlier outbound message from this thread
+    // Check if there was an earlier outbound message from this thread with a valid identity
     const priorOutbound = previousMessages.find((m) => m.direction === "outbound" && m.fromEmail);
     if (priorOutbound?.fromEmail) {
-      senderAddress = priorOutbound.fromEmail;
-    } else {
-      // If it started from an inbound message, check which of our mailboxes it was sent to
-      const priorInbound = previousMessages.find((m) => m.direction === "inbound" && m.toEmails?.length > 0);
-      if (priorInbound?.toEmails?.[0]) {
-        senderAddress = priorInbound.toEmails[0];
+      const cleanPrior = priorOutbound.fromEmail.replace(/^.*<([^>]+)>.*$/, "$1").trim().toLowerCase();
+      if (registeredMap.has(cleanPrior)) {
+        senderAddress = registeredMap.get(cleanPrior)!;
+      } else {
+        senderAddress = priorOutbound.fromEmail;
       }
     }
 
+    // If starting from an inbound message, find the recipient address that belongs to OUR identities
     if (!senderAddress) {
-      senderAddress = process.env.EMAIL_FROM || "Support <support@yourdomain.com>";
+      const priorInbound = previousMessages.find((m) => m.direction === "inbound" && m.toEmails?.length > 0);
+      if (priorInbound?.toEmails) {
+        for (const recipient of priorInbound.toEmails) {
+          const cleanRecip = recipient.replace(/^.*<([^>]+)>.*$/, "$1").trim().toLowerCase();
+          if (registeredMap.has(cleanRecip)) {
+            senderAddress = registeredMap.get(cleanRecip)!;
+            break;
+          }
+        }
+      }
+    }
+
+    // Fallback to default sender identity in database
+    if (!senderAddress) {
+      const defaultIdent = identities.find((i) => i.isDefault) || identities[0];
+      if (defaultIdent) {
+        senderAddress = `${defaultIdent.name} <${defaultIdent.email}>`;
+      }
+    }
+
+    // Final fallback to verified environment address
+    if (!senderAddress) {
+      senderAddress = process.env.EMAIL_FROM || "Support <support@mail.systemdevify.com>";
     }
 
     const subject = thread.subject.startsWith("Re:")
@@ -115,6 +142,11 @@ export async function replyToThread({
       };
     }
 
+    // Parse clean sender email and display name
+    const fromMatch = senderAddress.match(/^(?:(.*?)<)?([^<>]+)>?$/);
+    const parsedFromName = fromMatch ? fromMatch[1]?.trim().replace(/^["']|["']$/g, "") || null : null;
+    const parsedFromEmail = fromMatch ? fromMatch[2]?.trim().toLowerCase() : senderAddress.trim().toLowerCase();
+
     // 6. Record message in DB
     const [newMessage] = await db
       .insert(messages)
@@ -122,7 +154,8 @@ export async function replyToThread({
         threadId: thread.id,
         direction: "outbound",
         resendEmailId: resendData?.id,
-        fromEmail: senderAddress,
+        fromEmail: parsedFromEmail,
+        fromName: parsedFromName,
         toEmails: [thread.contactEmail],
         subject,
         textBody: body,
