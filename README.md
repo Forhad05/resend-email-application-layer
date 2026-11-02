@@ -969,3 +969,15 @@ If this open-source tool has been valuable to you and you'd like to support inde
 
 > **Note:** *Contributions may originate from halal sources.*
 > **Note:** *May Allah accept your generosity and grant barakah.*
+
+## 💖 Support & Sponsorship
+
+If my open-source tools, native Liquid modules, or performance scripts save your agency or store hours of development time, consider backing the maintenance.
+
+| Tier | Commitment | What You Get |
+| :--- | :--- | :--- |
+| **☕ Developer Backer** | **$10 / month** | Name/Logo in the repo acknowledgments & priority bug report tracking. |
+| **🚀 Agency Sponsor** | **$50 / month** | Direct access to private updates, custom schema code snippets, and feature requests. |
+| **🏢 Enterprise Partner** | **$200+ / month** | Direct architectural consultation, priority Core Web Vitals audits, and custom native implementations. |
+
+* [Sponsor via GitHub](https://github.com/sponsors/Forhad05) or [Inquire for Direct B2B Retainers](mailto:contract@mail.systemdevify.com).
