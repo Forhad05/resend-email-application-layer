@@ -1,7 +1,8 @@
 "use client";
 
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef, useEffect } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import {
   Inbox,
   Search,
@@ -10,9 +11,12 @@ import {
   AlertTriangle,
   X,
   Tag,
+  CornerDownLeft,
 } from "lucide-react";
 import { InboxLiveRefresher } from "./InboxLiveRefresher";
 import { getLabelColorClass } from "@/lib/email/labels";
+import { isInputFocused } from "@/components/shortcuts/KeyboardShortcutsProvider";
+import { updateThreadStatusAction } from "@/app/(dashboard)/inbox/[threadId]/actions";
 
 export interface ThreadItem {
   id: string;
@@ -42,10 +46,13 @@ export function InboxThreadView({
   initialThreads,
   teamMembers,
 }: InboxThreadViewProps) {
+  const router = useRouter();
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedAssignee, setSelectedAssignee] = useState<string>("all");
   const [selectedLabel, setSelectedLabel] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+  const [selectedIndex, setSelectedIndex] = useState<number>(-1);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   // Collect all unique labels and their frequency counts
   const labelCounts = useMemo(() => {
@@ -123,6 +130,70 @@ export function InboxThreadView({
   const latestTimestamp = initialThreads[0]?.lastMessageAt
     ? new Date(initialThreads[0].lastMessageAt).toISOString()
     : null;
+
+  // Keyboard navigation listener (j/k, Enter, e, /)
+  useEffect(() => {
+    function handleInboxKeyDown(e: KeyboardEvent) {
+      if (isInputFocused()) {
+        if (e.key === "Escape") {
+          (document.activeElement as HTMLElement)?.blur();
+          e.preventDefault();
+        }
+        return;
+      }
+
+      // / focuses search bar
+      if (e.key === "/") {
+        e.preventDefault();
+        searchInputRef.current?.focus();
+        return;
+      }
+
+      // j or ArrowDown -> Next thread
+      if (e.key === "j" || e.key === "ArrowDown") {
+        e.preventDefault();
+        setSelectedIndex((prev) => {
+          if (filteredThreads.length === 0) return -1;
+          const next = prev + 1;
+          return next >= filteredThreads.length ? 0 : next;
+        });
+        return;
+      }
+
+      // k or ArrowUp -> Previous thread
+      if (e.key === "k" || e.key === "ArrowUp") {
+        e.preventDefault();
+        setSelectedIndex((prev) => {
+          if (filteredThreads.length === 0) return -1;
+          const next = prev - 1;
+          return next < 0 ? filteredThreads.length - 1 : next;
+        });
+        return;
+      }
+
+      // Enter or 'o' -> Open active thread
+      if (e.key === "Enter" || e.key === "o") {
+        if (selectedIndex >= 0 && selectedIndex < filteredThreads.length) {
+          e.preventDefault();
+          router.push(`/inbox/${filteredThreads[selectedIndex].id}`);
+          return;
+        }
+      }
+
+      // e -> Quick toggle resolve/open on highlighted thread
+      if (e.key === "e") {
+        if (selectedIndex >= 0 && selectedIndex < filteredThreads.length) {
+          e.preventDefault();
+          const target = filteredThreads[selectedIndex];
+          const newStatus = target.status === "resolved" ? "open" : "resolved";
+          updateThreadStatusAction(target.id, newStatus);
+        }
+      }
+    }
+
+    window.addEventListener("keydown", handleInboxKeyDown);
+    return () => window.removeEventListener("keydown", handleInboxKeyDown);
+  }, [filteredThreads, selectedIndex, router]);
 
   // Status visual pill styles
   const statusStyles: Record<string, string> = {
@@ -212,10 +283,11 @@ export function InboxThreadView({
             <div className="relative flex-1 sm:w-56">
               <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-zinc-400 pointer-events-none" />
               <input
+                ref={searchInputRef}
                 type="text"
                 value={searchQuery}
                 onChange={(e) => setSearchQuery(e.target.value)}
-                placeholder="Search conversations..."
+                placeholder="Search conversations... (Press /)"
                 className="w-full bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-lg pl-8 pr-7 py-1.5 text-xs text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none focus:ring-1 focus:ring-black dark:focus:ring-white"
               />
               {searchQuery && (
@@ -327,8 +399,9 @@ export function InboxThreadView({
           </div>
         ) : (
           <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl divide-y divide-zinc-200 dark:divide-zinc-800 bg-white dark:bg-zinc-950 overflow-hidden shadow-xs">
-            {filteredThreads.map((thread) => {
+            {filteredThreads.map((thread, idx) => {
               const isUnread = !thread.isRead;
+              const isSelected = selectedIndex === idx;
               const formattedDate = thread.lastMessageAt
                 ? new Date(thread.lastMessageAt).toLocaleDateString()
                 : "Just now";
@@ -337,8 +410,10 @@ export function InboxThreadView({
                 <Link
                   key={thread.id}
                   href={`/inbox/${thread.id}`}
-                  className={`block p-4 transition-colors ${
-                    isUnread
+                  className={`block p-4 transition-all ${
+                    isSelected
+                      ? "ring-2 ring-indigo-500 bg-indigo-50/70 dark:bg-indigo-950/40 relative z-10"
+                      : isUnread
                       ? "bg-blue-50/40 dark:bg-blue-950/20 hover:bg-blue-50/70 dark:hover:bg-blue-950/30 border-l-4 border-l-blue-600"
                       : "hover:bg-zinc-50 dark:hover:bg-zinc-900/50"
                   }`}
@@ -393,6 +468,11 @@ export function InboxThreadView({
                         {thread.messageCount === 1 ? "msg" : "msgs"}
                       </span>
                       <span>{formattedDate}</span>
+                      {isSelected && (
+                        <span className="hidden sm:inline-flex items-center gap-1 text-[10px] text-indigo-600 dark:text-indigo-400 font-medium bg-indigo-100/80 dark:bg-indigo-900/60 px-1.5 py-0.5 rounded">
+                          <CornerDownLeft className="h-3 w-3" /> Enter
+                        </span>
+                      )}
                     </div>
                   </div>
 

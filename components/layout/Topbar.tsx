@@ -3,13 +3,15 @@
 import { useState, useRef, useEffect } from "react";
 import { usePathname, useRouter } from "next/navigation";
 import Link from "next/link";
-import { Bell, Search, LogOut, Settings, User as UserIcon, Shield } from "lucide-react";
+import { Bell, Search, LogOut, Settings, User as UserIcon, Shield, Keyboard } from "lucide-react";
 import { useSession, signOut } from "@/lib/auth-client";
+import { useKeyboardShortcuts } from "@/components/shortcuts/KeyboardShortcutsProvider";
 
 export function Topbar() {
   const pathname = usePathname();
   const router = useRouter();
   const { data: session } = useSession();
+  const { toggleModal } = useKeyboardShortcuts();
   const [dropdownOpen, setDropdownOpen] = useState(false);
   const dropdownRef = useRef<HTMLDivElement>(null);
 
@@ -64,10 +66,24 @@ export function Topbar() {
           <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-zinc-400" />
           <input
             type="text"
-            placeholder="Search threads, contacts..."
+            placeholder="Search threads, contacts... (Press /)"
             className="w-full pl-9 pr-4 py-1.5 text-sm bg-zinc-100 dark:bg-zinc-800 border-none rounded-lg focus:outline-none focus:ring-2 focus:ring-black dark:focus:ring-white text-zinc-900 dark:text-zinc-100 placeholder-zinc-400"
           />
         </div>
+
+        {/* Keyboard Shortcuts Trigger */}
+        <button
+          type="button"
+          onClick={toggleModal}
+          title="Keyboard Shortcuts (Press ?)"
+          aria-label="Keyboard Shortcuts"
+          className="p-2 text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100 rounded-lg hover:bg-zinc-100 dark:hover:bg-zinc-800 transition flex items-center gap-1.5"
+        >
+          <Keyboard className="h-4 w-4" />
+          <kbd className="hidden md:inline-block px-1.5 py-0.5 rounded border border-zinc-200 dark:border-zinc-700 bg-zinc-50 dark:bg-zinc-800 font-mono text-[10px] text-zinc-500 font-bold">
+            ?
+          </kbd>
+        </button>
 
         {/* Notification Icon */}
         <button

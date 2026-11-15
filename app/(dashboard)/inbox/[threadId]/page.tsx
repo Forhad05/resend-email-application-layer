@@ -16,6 +16,7 @@ import { ThreadComposerTabs } from "@/components/inbox/ThreadComposerTabs";
 import { ThreadLiveRefresher } from "@/components/inbox/ThreadLiveRefresher";
 import { ThreadWorkflowControls } from "@/components/inbox/ThreadWorkflowControls";
 import { ThreadTagEditor } from "@/components/inbox/ThreadTagEditor";
+import { ThreadKeyboardShortcuts } from "@/components/inbox/ThreadKeyboardShortcuts";
 import { DeliveryStatusBadge } from "@/components/inbox/DeliveryStatusBadge";
 import { AuditTimelineItem } from "@/components/audit/AuditTimelineItem";
 import { getThreadAuditLogs } from "@/lib/audit";
@@ -166,6 +167,12 @@ async function ThreadDetails({
 
   return (
     <div className="space-y-6">
+      {/* Thread Hotkey Controller (r, e, u) */}
+      <ThreadKeyboardShortcuts
+        threadId={thread.id}
+        currentStatus={thread.status}
+      />
+
       {/* Thread Header Info & Workflow Controls */}
       <div className="border border-zinc-200 dark:border-zinc-800 rounded-xl bg-white dark:bg-zinc-900 p-6 shadow-sm space-y-4">
         <div className="flex flex-wrap items-center justify-between gap-4">

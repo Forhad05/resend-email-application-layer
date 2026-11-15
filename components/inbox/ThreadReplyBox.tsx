@@ -121,14 +121,21 @@ export function ThreadReplyBox({
         )}
 
         <textarea
+          id="thread-reply-textarea"
           rows={4}
           value={body}
           onChange={(e) => setBody(e.target.value)}
+          onKeyDown={(e) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "Enter") {
+              e.preventDefault();
+              handleReply(e);
+            }
+          }}
           disabled={isSuppressed}
           placeholder={
             isSuppressed
               ? "Cannot reply: recipient email address is on the suppression list."
-              : "Write your reply to this conversation..."
+              : "Write your reply to this conversation... (Press ⌘/Ctrl+Enter to send)"
           }
           className="w-full bg-transparent text-sm text-zinc-900 dark:text-zinc-100 placeholder-zinc-400 focus:outline-none resize-y font-sans disabled:opacity-50 disabled:cursor-not-allowed"
         />
@@ -143,11 +150,22 @@ export function ThreadReplyBox({
         </div>
 
         <div className="flex items-center justify-between pt-2 border-t border-zinc-100 dark:border-zinc-800">
-          <span className="text-xs text-zinc-400">
-            {isSuppressed
-              ? "Replies disabled due to suppression enforcement"
-              : "Replies include In-Reply-To and References headers"}
-          </span>
+          <div className="flex items-center gap-2 text-xs text-zinc-400">
+            <span>
+              {isSuppressed
+                ? "Replies disabled due to suppression enforcement"
+                : "Replies include In-Reply-To and References headers"}
+            </span>
+            {!isSuppressed && (
+              <span className="hidden sm:inline-flex items-center gap-1 text-[11px] text-zinc-400">
+                • Press{" "}
+                <kbd className="px-1.5 py-0.2 rounded bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 font-mono text-[10px]">
+                  ⌘/Ctrl+Enter
+                </kbd>{" "}
+                to send
+              </span>
+            )}
+          </div>
           <button
             type="submit"
             disabled={isPending || !body.trim() || isSuppressed}
