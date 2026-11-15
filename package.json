@@ -20,7 +20,12 @@
     "tunnel:logs": "docker compose logs -f tunnel",
     "build": "next build",
     "start": "next start",
-    "lint": "eslint"
+    "lint": "eslint",
+    "test:smoke": "tsx scripts/test-smoke.ts",
+    "test:webhooks": "tsx scripts/test-webhooks.ts",
+    "test:stress": "tsx scripts/test-stress.ts",
+    "test:fuzz": "tsx scripts/test-fuzz.ts",
+    "test:all": "tsx scripts/test-smoke.ts && tsx scripts/test-webhooks.ts && tsx scripts/test-stress.ts && tsx scripts/test-fuzz.ts"
   },
   "dependencies": {
     "@react-email/components": "^1.0.12",
