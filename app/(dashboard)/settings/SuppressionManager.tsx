@@ -49,18 +49,23 @@ export function SuppressionManager({
   const [removingEmail, setRemovingEmail] = useState<string | null>(null);
   const alertTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Auto-dismiss cleanup & Escape key listener
+  // Cleanup alert timer on unmount
   useEffect(() => {
+    return () => {
+      if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
+    };
+  }, []);
+
+  // Keyboard accessibility: Escape to dismiss add modal
+  useEffect(() => {
+    if (!showAddModal) return;
     function handleKeyDown(e: KeyboardEvent) {
-      if (e.key === "Escape" && showAddModal) {
+      if (e.key === "Escape") {
         setShowAddModal(false);
       }
     }
     window.addEventListener("keydown", handleKeyDown);
-    return () => {
-      window.removeEventListener("keydown", handleKeyDown);
-      if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
-    };
+    return () => window.removeEventListener("keydown", handleKeyDown);
   }, [showAddModal]);
 
   const filteredItems = useMemo(() => {
@@ -370,6 +375,7 @@ export function SuppressionManager({
                 <input
                   type="email"
                   required
+                  autoFocus
                   placeholder="e.g. user@example.com"
                   value={addEmail}
                   onChange={(e) => setAddEmail(e.target.value)}

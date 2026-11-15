@@ -119,10 +119,10 @@ export async function removeSuppressionAction(
         process.env.RESEND_API_KEY &&
         !process.env.RESEND_API_KEY.startsWith("re_placeholder")
       ) {
-        // Resend SDK suppressions remove takes email string as first param
-        await (resend.suppressions as unknown as { remove: (idOrEmail: string) => Promise<unknown> }).remove(
-          cleanEmail
-        );
+        const resendRes = await resend.suppressions.remove(cleanEmail);
+        if (resendRes?.error) {
+          console.warn("Resend API suppression remove notice:", resendRes.error);
+        }
       }
     } catch (resendErr) {
       console.warn("Resend API suppression remove warning (non-fatal):", resendErr);
@@ -199,9 +199,12 @@ export async function addSuppressionAction(
         process.env.RESEND_API_KEY &&
         !process.env.RESEND_API_KEY.startsWith("re_placeholder")
       ) {
-        await (resend.suppressions as unknown as { add: (params: { email: string }) => Promise<unknown> }).add({
+        const resendRes = await resend.suppressions.add({
           email: cleanEmail,
         });
+        if (resendRes?.error) {
+          console.warn("Resend API suppression add notice:", resendRes.error);
+        }
       }
     } catch (resendErr) {
       console.warn("Resend API suppression add warning (non-fatal):", resendErr);
