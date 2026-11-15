@@ -2,9 +2,17 @@ import { NextRequest, NextResponse } from "next/server";
 import { resend } from "@/lib/resend";
 import { recordWebhookEvent, dispatchWebhookEvent } from "@/lib/webhook/queue";
 
+const MAX_WEBHOOK_PAYLOAD_BYTES = 35 * 1024 * 1024; // 35 MB safety threshold
+
 export async function POST(req: NextRequest) {
   try {
     const rawPayload = await req.text();
+    if (rawPayload.length > MAX_WEBHOOK_PAYLOAD_BYTES) {
+      return NextResponse.json(
+        { error: "Payload exceeds maximum allowed size" },
+        { status: 413 }
+      );
+    }
     const webhookSecret = process.env.RESEND_WEBHOOK_SECRET;
 
     const svixId = req.headers.get("svix-id");

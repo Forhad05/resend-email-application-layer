@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useMemo } from "react";
+import { useState, useTransition, useMemo, useRef, useEffect } from "react";
 import { WebhookEvent } from "@/lib/db/schema";
 import { replayWebhookEventAction } from "@/lib/webhook/queue";
 import {
@@ -40,6 +40,21 @@ export function WebhookDlqView({ initialEvents, stats }: WebhookDlqViewProps) {
     type: "success" | "error";
     message: string;
   } | null>(null);
+  const copyTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  // Keyboard accessibility: Escape to dismiss inspector modal + timer cleanup
+  useEffect(() => {
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape" && inspectingEvent) {
+        setInspectingEvent(null);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    };
+  }, [inspectingEvent]);
 
   const filteredEvents = useMemo(() => {
     return events.filter((ev) => {
@@ -105,7 +120,8 @@ export function WebhookDlqView({ initialEvents, stats }: WebhookDlqViewProps) {
   const copyToClipboard = (text: string) => {
     navigator.clipboard.writeText(text);
     setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
+    if (copyTimerRef.current) clearTimeout(copyTimerRef.current);
+    copyTimerRef.current = setTimeout(() => setCopied(false), 2000);
   };
 
   const getStatusBadge = (status: string) => {

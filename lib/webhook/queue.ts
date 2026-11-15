@@ -134,6 +134,13 @@ export async function dispatchWebhookEvent(
   }
 }
 
+function sanitizeErrorMessage(msg: string): string {
+  const sanitized = msg
+    .replace(/postgresql:\/\/[^@\s]+@[^\s/]+/gi, "postgresql://[redacted]")
+    .replace(/\/home\/[^\s:]+/gi, "[internal path]");
+  return sanitized.length > 200 ? sanitized.slice(0, 200) + "..." : sanitized;
+}
+
 /**
  * 3. Server action for operators to manually retry a failed/dead-letter event from the dashboard
  */
@@ -167,7 +174,7 @@ export async function replayWebhookEventAction(
     entityId: eventId,
     details: {
       success: result.success,
-      error: result.error,
+      error: result.error ? sanitizeErrorMessage(result.error) : undefined,
     },
   });
 
@@ -177,7 +184,14 @@ export async function replayWebhookEventAction(
     // Non-fatal outside request store
   }
 
-  return result;
+  return {
+    success: result.success,
+    error: result.success
+      ? undefined
+      : result.error
+      ? sanitizeErrorMessage(result.error)
+      : "Failed to dispatch webhook event",
+  };
 }
 
 /**
