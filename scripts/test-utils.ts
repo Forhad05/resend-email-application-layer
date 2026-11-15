@@ -131,3 +131,37 @@ export function getAppUrl(): string {
     "http://localhost:3000"
   ).replace(/\/$/, "");
 }
+
+export interface LatencyStats {
+  min: number;
+  max: number;
+  avg: number;
+  p50: number;
+  p95: number;
+  p99: number;
+  throughputRps: number;
+}
+
+/**
+ * Compute statistical latency percentiles and throughput metrics
+ */
+export function calculateLatencyStats(
+  durationsMs: number[],
+  totalDurationMs: number
+): LatencyStats {
+  if (durationsMs.length === 0) {
+    return { min: 0, max: 0, avg: 0, p50: 0, p95: 0, p99: 0, throughputRps: 0 };
+  }
+  const sorted = [...durationsMs].sort((a, b) => a - b);
+  const min = Math.round(sorted[0] * 10) / 10;
+  const max = Math.round(sorted[sorted.length - 1] * 10) / 10;
+  const sum = sorted.reduce((acc, v) => acc + v, 0);
+  const avg = Math.round((sum / sorted.length) * 10) / 10;
+  const p50 = Math.round(sorted[Math.floor(sorted.length * 0.5)] * 10) / 10;
+  const p95 = Math.round(sorted[Math.floor(sorted.length * 0.95)] * 10) / 10;
+  const p99 = Math.round(sorted[Math.min(sorted.length - 1, Math.floor(sorted.length * 0.99))] * 10) / 10;
+  const totalSeconds = Math.max(totalDurationMs / 1000, 0.001);
+  const throughputRps = Math.round((durationsMs.length / totalSeconds) * 10) / 10;
+
+  return { min, max, avg, p50, p95, p99, throughputRps };
+}
