@@ -6,6 +6,17 @@ const MAX_WEBHOOK_PAYLOAD_BYTES = 35 * 1024 * 1024; // 35 MB safety threshold
 
 export async function POST(req: NextRequest) {
   try {
+    const contentLength = req.headers.get("content-length");
+    if (contentLength) {
+      const parsedLen = parseInt(contentLength, 10);
+      if (!isNaN(parsedLen) && parsedLen > MAX_WEBHOOK_PAYLOAD_BYTES) {
+        return NextResponse.json(
+          { error: "Payload exceeds maximum allowed size" },
+          { status: 413 }
+        );
+      }
+    }
+
     const rawPayload = await req.text();
     if (rawPayload.length > MAX_WEBHOOK_PAYLOAD_BYTES) {
       return NextResponse.json(
@@ -53,6 +64,13 @@ export async function POST(req: NextRequest) {
           { status: 400 }
         );
       }
+    }
+
+    if (!event || typeof event !== "object" || Array.isArray(event)) {
+      return NextResponse.json(
+        { error: "Invalid payload: Expected a JSON object" },
+        { status: 400 }
+      );
     }
 
     // Support both Resend webhook wrappers and direct email worker payloads
