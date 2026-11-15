@@ -3,6 +3,7 @@ import { db } from "@/lib/db";
 import { attachments } from "@/lib/db/schema";
 import { eq, or } from "drizzle-orm";
 import fs from "fs/promises";
+import path from "path";
 
 interface RouteParams {
   params: Promise<{ id: string }>;
@@ -35,8 +36,22 @@ export async function GET(
       return new NextResponse("Attachment not found", { status: 404 });
     }
 
+    // Path Traversal Security Guard: Ensure resolved storage path is inside uploads directory
+    const uploadsDir = path.resolve(process.cwd(), "uploads");
+    const resolvedPath = path.resolve(att.storagePath);
+    if (!resolvedPath.startsWith(uploadsDir)) {
+      return new NextResponse("Access denied: Invalid attachment path", { status: 403 });
+    }
+
+    // Verify physical file exists on disk
+    try {
+      await fs.access(resolvedPath);
+    } catch {
+      return new NextResponse("Attachment file not found on disk", { status: 404 });
+    }
+
     // 2. Read file from disk
-    const fileBuffer = await fs.readFile(att.storagePath);
+    const fileBuffer = await fs.readFile(resolvedPath);
 
     // 3. Return file download response
     const safeFilename = encodeURIComponent(att.filename);

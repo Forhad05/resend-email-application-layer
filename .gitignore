@@ -41,6 +41,9 @@ yarn-error.log*
 .idea/
 .vscode/
 
+# local uploads & attachments storage
+uploads/
+
 # typescript
 *.tsbuildinfo
 next-env.d.ts
