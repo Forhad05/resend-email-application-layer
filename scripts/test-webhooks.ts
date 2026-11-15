@@ -14,6 +14,8 @@
 import { eq, inArray, or, sql } from "drizzle-orm";
 import { db, pool } from "../lib/db";
 import {
+  auditLogs,
+  contacts,
   messages,
   suppressions,
   threads,
@@ -27,6 +29,47 @@ import {
   printSummary,
   TestResult,
 } from "./test-utils";
+
+async function cleanupSimulationRecords(params?: {
+  threadIds?: string[];
+  eventIds?: string[];
+  resendIds?: string[];
+  emails?: string[];
+}) {
+  try {
+    const threadIds = params?.threadIds || [];
+    const eventIds = params?.eventIds || [];
+    const resendIds = params?.resendIds || [];
+    const emails = params?.emails || [];
+
+    if (threadIds.length > 0) {
+      await db.delete(messages).where(inArray(messages.threadId, threadIds));
+      await db.delete(threads).where(inArray(threads.id, threadIds));
+    }
+    if (resendIds.length > 0) {
+      await db.delete(messages).where(inArray(messages.resendEmailId, resendIds));
+    }
+    if (emails.length > 0) {
+      await db.delete(contacts).where(inArray(contacts.email, emails));
+      await db.delete(suppressions).where(inArray(suppressions.email, emails));
+    }
+    if (eventIds.length > 0) {
+      await db.delete(webhookEvents).where(inArray(webhookEvents.id, eventIds));
+    }
+
+    // Exhaustive safety sweep: clear any simulation.local contacts, audits, messages, or threads
+    await db.delete(contacts).where(sql`email LIKE '%simulation.local%'`);
+    await db.delete(auditLogs).where(
+      sql`details::text LIKE '%simulation.local%' OR entity_id LIKE '%simulation.local%'`
+    );
+    await db.delete(messages).where(sql`from_email LIKE '%simulation.local%'`);
+    await db.delete(threads).where(sql`subject LIKE '%Production database cluster unavailable%'`);
+    await db.delete(suppressions).where(sql`email LIKE '%simulation.local%'`);
+    await db.delete(webhookEvents).where(sql`payload::text LIKE '%simulation.local%'`);
+  } catch (cleanErr) {
+    console.warn("Cleanup warning:", cleanErr);
+  }
+}
 
 async function runWebhookSimulation() {
   const appUrl = getAppUrl();
@@ -47,16 +90,13 @@ async function runWebhookSimulation() {
   );
 
   // Pre-test cleanup: ensure no residual simulation artifacts exist
-  try {
-    await db.delete(messages).where(sql`from_email LIKE '%simulation.local%'`);
-    await db.delete(threads).where(sql`subject LIKE '%Production database cluster unavailable%'`);
-    await db.delete(suppressions).where(sql`email LIKE '%simulation.local%'`);
-    await db.delete(webhookEvents).where(sql`payload::text LIKE '%simulation.local%'`);
-  } catch {}
+  await cleanupSimulationRecords();
 
   const results: TestResult[] = [];
   const createdThreadIds: string[] = [];
   const createdEventIds: string[] = [];
+
+  try {
 
   // ============================================================================
   // Stage 1: Inbound Ticket Creation & SLA Auto-Triage
@@ -557,33 +597,24 @@ async function runWebhookSimulation() {
     });
   }
 
-  // ============================================================================
-  // Teardown: Clean Database of Simulation Records
-  // ============================================================================
-  console.log(`\n${colors.dim}Cleaning up simulation test records...${colors.reset}`);
-  try {
-    if (createdThreadIds.length > 0) {
-      await db.delete(messages).where(inArray(messages.threadId, createdThreadIds));
-      await db.delete(threads).where(inArray(threads.id, createdThreadIds));
-    }
-    await db.delete(messages).where(
-      inArray(messages.resendEmailId, [outboundResendId, bounceResendId, complaintResendId])
-    );
-    await db.delete(suppressions).where(
-      inArray(suppressions.email, [simBounceEmail, simComplaintEmail])
-    );
-    if (createdEventIds.length > 0) {
-      await db.delete(webhookEvents).where(inArray(webhookEvents.id, createdEventIds));
-    }
+  } finally {
+    // ============================================================================
+    // Teardown: Clean Database of Simulation Records
+    // ============================================================================
+    console.log(`\n${colors.dim}Cleaning up simulation test records...${colors.reset}`);
+    await cleanupSimulationRecords({
+      threadIds: createdThreadIds,
+      eventIds: createdEventIds,
+      resendIds: [outboundResendId, bounceResendId, complaintResendId],
+      emails: [simCustomerEmail, simBounceEmail, simComplaintEmail],
+    });
     console.log(`${colors.green}✓ Database cleanup complete (zero residual simulation artifacts).${colors.reset}`);
-  } catch (cleanErr) {
-    console.warn("Cleanup encountered a non-fatal warning:", cleanErr);
-  }
 
-  // Clean pool connection
-  try {
-    await pool.end();
-  } catch {}
+    // Clean pool connection
+    try {
+      await pool.end();
+    } catch {}
+  }
 
   // ============================================================================
   // Summary & Process Exit

@@ -10,8 +10,9 @@
  * 6. Webhook ingestion durability
  */
 
-import { sql } from "drizzle-orm";
+import { eq, sql } from "drizzle-orm";
 import { db, pool } from "../lib/db";
+import { webhookEvents } from "../lib/db/schema";
 import {
   colors,
   getAppUrl,
@@ -292,6 +293,15 @@ async function runSmokeTests() {
     });
 
     const passed = whRes.status === 200 || whRes.status === 400;
+
+    // Immediately clean up the test webhook event to prevent database pollution
+    if (whRes.data?.eventId) {
+      try {
+        await db
+          .delete(webhookEvents)
+          .where(eq(webhookEvents.id, whRes.data.eventId));
+      } catch {}
+    }
     results.push({
       category: "Webhooks",
       name: "POST /api/webhooks/resend Endpoint Responsiveness",
