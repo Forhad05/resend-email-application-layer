@@ -40,6 +40,18 @@
 
 - **Zero-Reload Live Timeline**: Background synchronization detects incoming customer replies and delivery updates via tab focus and non-blocking polling, invoking Next.js router refresh with live toast notifications.
 - **Unread Indicators & Counters**: Dynamic unread counter badges on the sidebar and visual blue indicator dots on threads. Opening a conversation automatically marks it as read.
+- **Smart AI Reply Assistant**: Dual-engine contextual reply generator (Google Gemini 2.5 Flash + Smart Context Engine) synthesizing customer thread history, internal notes, and recipient names with tone customization (`Formal Resolution`, `Quick Acknowledgment`, `Clarification Request`) and human-in-the-loop preview.
+- **Automated SLA Routing & Escalation Engine**: Computes strict SLA deadlines based on ticket priority (`Urgent: 1h`, `High: 4h`, `Normal: 24h`, `Low: 48h`), displays live ticking badges (`useSyncExternalStore`), auto-tags (`SLA Breached`), auto-escalates priority, and supports filtered triage tabs.
+
+### 🛡️ Webhook DLQ & Ingestion Durability
+
+- **Zero-Drop Ingestion**: Incoming Resend webhook events are buffered into `webhook_events` with SHA-256 deduplication and up to 35 MB payload support.
+- **Dead-Letter Queue (DLQ) Dashboard (`/audit`)**: Dedicated management view to inspect failed/poison webhooks, analyze stack traces, and trigger 1-click re-processing with exponential backoff and maximum retry thresholds.
+
+### 📊 Deliverability Analytics & Domain Breakdown (`/analytics`)
+
+- **Domain Performance Breakdown**: CTE-optimized analytics reporting delivery rates, open rates, bounce rates, and spam complaints across recipient domains (`gmail.com`, `yahoo.com`, `outlook.com`, custom corporate domains).
+- **Suppression Management UI (`/settings`)**: Direct view of blocked and unsubscribed addresses with manual add/delete and bi-directional synchronization with the Resend Suppressions API.
 
 ### 🧵 Smart RFC 822 Inbound Threading
 
@@ -916,6 +928,9 @@ Open [http://localhost:3000](http://localhost:3000) in your browser. Default tem
 | `npm run dev:all` | Concurrently starts Docker Postgres, Next.js dev server, and Cloudflare tunnel. |
 | `npm run db:start` | Starts PostgreSQL container via `docker compose up -d postgres`. |
 | `npm run db:stop` | Stops PostgreSQL container via `docker compose stop postgres`. |
+| `npm run db:push` | Pushes Drizzle schema directly to database during development. |
+| `npm run db:generate` | Freezes schema into versioned SQL migrations in `drizzle/`. |
+| `npm run db:migrate` | Executes generated SQL migrations against PostgreSQL. |
 | `npm run docker:up` | Boots the entire application stack (Next.js + Postgres) with Docker Compose. |
 | `npm run docker:down` | Stops and removes Docker Compose containers and networks. |
 | `npm run docker:build` | Rebuilds the production Next.js Docker image. |
@@ -928,13 +943,15 @@ Open [http://localhost:3000](http://localhost:3000) in your browser. Default tem
 ## 🔒 Security & Reliability Architecture
 
 1. **Ingress Protection (Brotli Shield)**:
-   [`middleware.ts`](file:///home/apon/Projects/email-application/middleware.ts) inspects inbound HTTP requests and rejects `Content-Encoding: br` with `415 Unsupported Media Type`, neutralizing potential Brotli decompressor buffer overflows (CVE-2026-111497) before payloads touch Node.js.
+   [`proxy.ts`](file:///home/mhforhad/Desktop/Projects/SystemDevify/resend-email-application-layer/proxy.ts) inspects inbound HTTP requests and rejects `Content-Encoding: br` with `415 Unsupported Media Type`, neutralizing potential Brotli decompressor buffer overflows (CVE-2026-111497) before payloads touch Node.js.
 2. **Reputation Defense (Automated Suppression List)**:
    Every outbound send action checks the `suppressions` table. Addresses that generate hard bounces or spam complaints are flagged automatically via Resend webhooks and permanently blocked from future sends.
 3. **MIME Parsing Isolation**:
    Inbound stream parsing uses `postal-mime` running in a dedicated server context, preventing raw email streams from polluting or breaking client bundles.
 4. **Zero-Trust Inbound Tunneling**:
    Cloudflare Email Worker `email-dual-router` bifurcates incoming emails at the edge using `message.raw.tee()`, forwarding a copy to a backup Gmail inbox while simultaneously transmitting the raw MIME body to the Next.js webhook receiver over an encrypted tunnel.
+5. **System Health Probe**:
+   `GET /api/health` reports live PostgreSQL ping latency, process uptime, and memory consumption for container orchestrators and uptime monitors.
 
 ---
 
