@@ -23,6 +23,7 @@ async function ThreadList() {
         messageCount: threads.messageCount,
         lastMessageAt: threads.lastMessageAt,
         isRead: threads.isRead,
+        labels: threads.labels,
       })
       .from(threads)
       .leftJoin(user, eq(threads.assignedTo, user.id))

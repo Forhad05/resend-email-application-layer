@@ -13,6 +13,7 @@ import {
   OutboundAttachment,
 } from "@/lib/email/attachments";
 import { logAuditEvent } from "@/lib/audit";
+import { cleanLabel } from "@/lib/email/labels";
 
 export async function replyAction(
   threadIdOrFormData: string | FormData,
@@ -304,4 +305,103 @@ export async function createInternalNoteAction(
 
 export async function getTeamMembersAction() {
   return await getTeamMembers();
+}
+
+export async function addThreadLabelAction(threadId: string, rawLabel: string) {
+  try {
+    const label = cleanLabel(rawLabel);
+    if (!label) {
+      return { success: false, error: "Label cannot be empty" };
+    }
+
+    const [thread] = await db
+      .select({ labels: threads.labels })
+      .from(threads)
+      .where(eq(threads.id, threadId))
+      .limit(1);
+
+    if (!thread) {
+      return { success: false, error: "Thread not found" };
+    }
+
+    const currentLabels = thread.labels || [];
+    if (currentLabels.includes(label)) {
+      return { success: true, labels: currentLabels };
+    }
+
+    const updatedLabels = [...currentLabels, label];
+
+    await db
+      .update(threads)
+      .set({
+        labels: updatedLabels,
+        updatedAt: new Date(),
+      })
+      .where(eq(threads.id, threadId));
+
+    await logAuditEvent({
+      action: "thread.label_added",
+      entityType: "thread",
+      entityId: threadId,
+      details: { label, allLabels: updatedLabels },
+    });
+
+    try {
+      revalidatePath(`/inbox/${threadId}`);
+      revalidatePath("/inbox");
+    } catch {
+      // Revalidation may fail outside Next.js request context
+    }
+
+    return { success: true, labels: updatedLabels };
+  } catch (err: unknown) {
+    console.error("Failed to add thread label:", err);
+    return { success: false, error: "Failed to add label" };
+  }
+}
+
+export async function removeThreadLabelAction(threadId: string, rawLabel: string) {
+  try {
+    const label = cleanLabel(rawLabel);
+
+    const [thread] = await db
+      .select({ labels: threads.labels })
+      .from(threads)
+      .where(eq(threads.id, threadId))
+      .limit(1);
+
+    if (!thread) {
+      return { success: false, error: "Thread not found" };
+    }
+
+    const currentLabels = thread.labels || [];
+    const updatedLabels = currentLabels.filter((l) => l !== label);
+
+    await db
+      .update(threads)
+      .set({
+        labels: updatedLabels,
+        updatedAt: new Date(),
+      })
+      .where(eq(threads.id, threadId));
+
+    await logAuditEvent({
+      action: "thread.label_removed",
+      entityType: "thread",
+      entityId: threadId,
+      details: { label, allLabels: updatedLabels },
+    });
+
+    try {
+      revalidatePath(`/inbox/${threadId}`);
+      revalidatePath("/inbox");
+    } catch {
+      // Revalidation may fail outside Next.js request context
+    }
+
+    return { success: true, labels: updatedLabels };
+  } catch (err: unknown) {
+    console.error("Failed to remove thread label:", err);
+    return { success: false, error: "Failed to remove label" };
+  }
 }

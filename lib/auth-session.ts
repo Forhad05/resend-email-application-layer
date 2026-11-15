@@ -9,8 +9,8 @@ export async function getServerSession(): Promise<AuthSession> {
       headers: await headers(),
     });
     return session;
-  } catch (error) {
-    console.error("Failed to retrieve server session:", error);
+  } catch {
+    // Outside request context (e.g. background jobs, scripts, test runner)
     return null;
   }
 }

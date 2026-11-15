@@ -8,6 +8,7 @@ import {
   FileText,
   Clock,
   ArrowRight,
+  Tag,
 } from "lucide-react";
 
 export interface AuditTimelineItemProps {
@@ -103,6 +104,26 @@ export function AuditTimelineItem({
   } else if (action === "thread.created") {
     icon = <Activity className="h-3.5 w-3.5 text-blue-500" />;
     description = <span>initiated conversation</span>;
+  } else if (action === "thread.label_added") {
+    icon = <Tag className="h-3.5 w-3.5 text-indigo-500" />;
+    description = (
+      <span>
+        added label{" "}
+        <span className="font-semibold text-zinc-900 dark:text-zinc-100 font-mono">
+          #{String(details?.label || "tag")}
+        </span>
+      </span>
+    );
+  } else if (action === "thread.label_removed") {
+    icon = <Tag className="h-3.5 w-3.5 text-zinc-400" />;
+    description = (
+      <span>
+        removed label{" "}
+        <span className="font-semibold text-zinc-900 dark:text-zinc-100 font-mono">
+          #{String(details?.label || "tag")}
+        </span>
+      </span>
+    );
   }
 
   return (

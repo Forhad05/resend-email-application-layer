@@ -15,6 +15,7 @@ import { getTemplates } from "@/lib/email/templates";
 import { ThreadComposerTabs } from "@/components/inbox/ThreadComposerTabs";
 import { ThreadLiveRefresher } from "@/components/inbox/ThreadLiveRefresher";
 import { ThreadWorkflowControls } from "@/components/inbox/ThreadWorkflowControls";
+import { ThreadTagEditor } from "@/components/inbox/ThreadTagEditor";
 import { DeliveryStatusBadge } from "@/components/inbox/DeliveryStatusBadge";
 import { AuditTimelineItem } from "@/components/audit/AuditTimelineItem";
 import { getThreadAuditLogs } from "@/lib/audit";
@@ -200,6 +201,15 @@ async function ThreadDetails({
                 {thread.contactEmail}
               </span>
             </p>
+
+            {/* Interactive Thread Tag Editor */}
+            <div className="flex flex-wrap items-center gap-2 mt-2.5">
+              <span className="text-xs text-zinc-400 font-medium">Tags:</span>
+              <ThreadTagEditor
+                threadId={thread.id}
+                initialLabels={thread.labels || []}
+              />
+            </div>
           </div>
 
           <div className="text-xs text-zinc-400 flex items-center gap-1">

@@ -9,8 +9,10 @@ import {
   AlertCircle,
   AlertTriangle,
   X,
+  Tag,
 } from "lucide-react";
 import { InboxLiveRefresher } from "./InboxLiveRefresher";
+import { getLabelColorClass } from "@/lib/email/labels";
 
 export interface ThreadItem {
   id: string;
@@ -23,6 +25,7 @@ export interface ThreadItem {
   messageCount: number;
   lastMessageAt: Date | string | null;
   isRead: boolean;
+  labels?: string[] | null;
 }
 
 interface TeamMember {
@@ -41,7 +44,25 @@ export function InboxThreadView({
 }: InboxThreadViewProps) {
   const [selectedStatus, setSelectedStatus] = useState<string>("all");
   const [selectedAssignee, setSelectedAssignee] = useState<string>("all");
+  const [selectedLabel, setSelectedLabel] = useState<string>("all");
   const [searchQuery, setSearchQuery] = useState<string>("");
+
+  // Collect all unique labels and their frequency counts
+  const labelCounts = useMemo(() => {
+    const countsMap = new Map<string, number>();
+    for (const t of initialThreads) {
+      if (t.labels) {
+        for (const l of t.labels) {
+          countsMap.set(l, (countsMap.get(l) || 0) + 1);
+        }
+      }
+    }
+    return countsMap;
+  }, [initialThreads]);
+
+  const uniqueLabels = useMemo(() => {
+    return Array.from(labelCounts.keys()).sort();
+  }, [labelCounts]);
 
   // Counts for tabs
   const counts = useMemo(() => {
@@ -74,18 +95,29 @@ export function InboxThreadView({
         return false;
       }
 
+      // Label filter
+      if (
+        selectedLabel !== "all" &&
+        (!thread.labels || !thread.labels.includes(selectedLabel))
+      ) {
+        return false;
+      }
+
       // Search query
       if (searchQuery.trim()) {
         const q = searchQuery.toLowerCase();
         const matchSubject = thread.subject.toLowerCase().includes(q);
         const matchEmail = thread.contactEmail.toLowerCase().includes(q);
         const matchAssignee = (thread.assigneeName || "").toLowerCase().includes(q);
-        return matchSubject || matchEmail || matchAssignee;
+        const matchLabels = (thread.labels || []).some((l) =>
+          l.toLowerCase().includes(q)
+        );
+        return matchSubject || matchEmail || matchAssignee || matchLabels;
       }
 
       return true;
     });
-  }, [initialThreads, selectedStatus, selectedAssignee, searchQuery]);
+  }, [initialThreads, selectedStatus, selectedAssignee, selectedLabel, searchQuery]);
 
   const unreadCount = initialThreads.filter((t) => !t.isRead).length;
   const latestTimestamp = initialThreads[0]?.lastMessageAt
@@ -216,6 +248,48 @@ export function InboxThreadView({
           </div>
         </div>
 
+        {/* Label / Tag Filter Bar */}
+        {uniqueLabels.length > 0 && (
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none text-xs pt-1 border-t border-zinc-100 dark:border-zinc-800/80">
+            <span className="text-zinc-400 font-medium flex items-center gap-1 shrink-0 mr-1 text-[11px]">
+              <Tag className="h-3 w-3" />
+              Tags:
+            </span>
+            <button
+              type="button"
+              onClick={() => setSelectedLabel("all")}
+              className={`px-2.5 py-0.5 rounded-full text-[11px] font-medium border transition-colors ${
+                selectedLabel === "all"
+                  ? "bg-zinc-800 text-white dark:bg-zinc-200 dark:text-black border-transparent"
+                  : "bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400 border-zinc-200 dark:border-zinc-700 hover:text-zinc-900 dark:hover:text-zinc-100"
+              }`}
+            >
+              All Tags
+            </button>
+            {uniqueLabels.map((lbl) => {
+              const isSelected = selectedLabel === lbl;
+              const count = labelCounts.get(lbl) || 0;
+              const colorClass = getLabelColorClass(lbl);
+              return (
+                <button
+                  key={lbl}
+                  type="button"
+                  onClick={() => setSelectedLabel(isSelected ? "all" : lbl)}
+                  className={`inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full text-[11px] font-medium border transition-all ${
+                    isSelected
+                      ? "ring-2 ring-indigo-500 ring-offset-1 dark:ring-offset-zinc-950 font-bold " +
+                        colorClass
+                      : colorClass + " opacity-80 hover:opacity-100"
+                  }`}
+                >
+                  <span>#{lbl}</span>
+                  <span className="text-[10px] opacity-70">({count})</span>
+                </button>
+              );
+            })}
+          </div>
+        )}
+
         {/* Thread List Table */}
         {filteredThreads.length === 0 ? (
           <div className="border border-dashed border-zinc-200 dark:border-zinc-800 rounded-xl p-12 text-center bg-white dark:bg-zinc-950">
@@ -226,16 +300,23 @@ export function InboxThreadView({
               No conversations found
             </h3>
             <p className="text-sm text-zinc-500 max-w-sm mx-auto mt-1 mb-4">
-              {searchQuery || selectedStatus !== "all" || selectedAssignee !== "all"
-                ? "No tickets match your active status, assignee, or search filters."
+              {searchQuery ||
+              selectedStatus !== "all" ||
+              selectedAssignee !== "all" ||
+              selectedLabel !== "all"
+                ? "No tickets match your active status, assignee, label, or search filters."
                 : "Your inbox is currently empty. Incoming customer emails or new outbound threads will appear here."}
             </p>
-            {(searchQuery || selectedStatus !== "all" || selectedAssignee !== "all") && (
+            {(searchQuery ||
+              selectedStatus !== "all" ||
+              selectedAssignee !== "all" ||
+              selectedLabel !== "all") && (
               <button
                 type="button"
                 onClick={() => {
                   setSelectedStatus("all");
                   setSelectedAssignee("all");
+                  setSelectedLabel("all");
                   setSearchQuery("");
                 }}
                 className="inline-flex items-center gap-1.5 px-3 py-1.5 bg-zinc-100 dark:bg-zinc-800 text-zinc-800 dark:text-zinc-200 rounded-lg text-xs font-semibold hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
@@ -324,6 +405,22 @@ export function InboxThreadView({
                   >
                     {thread.subject}
                   </p>
+
+                  {/* Thread Label Pills */}
+                  {thread.labels && thread.labels.length > 0 && (
+                    <div className="flex flex-wrap items-center gap-1.5 mt-2">
+                      {thread.labels.map((lbl) => (
+                        <span
+                          key={lbl}
+                          className={`inline-flex items-center px-2 py-0.5 rounded-full text-[10px] font-medium border ${getLabelColorClass(
+                            lbl
+                          )}`}
+                        >
+                          #{lbl}
+                        </span>
+                      ))}
+                    </div>
+                  )}
                 </Link>
               );
             })}
