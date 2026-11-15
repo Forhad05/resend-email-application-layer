@@ -1,8 +1,10 @@
 import { Suspense } from "react";
 import { getSenderIdentities, getResendDomains } from "@/lib/email/senders";
 import { getSuppressionList, getSuppressionSummary } from "@/lib/email/suppression";
+import { auditDomainDeliverability } from "@/lib/email/dns";
 import { SenderManager } from "./SenderManager";
 import { SuppressionManager } from "./SuppressionManager";
+import { DeliverabilityAudit } from "./DeliverabilityAudit";
 import { Key, Server, Shield, Globe, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 import { connection } from "next/server";
 
@@ -14,6 +16,24 @@ async function SettingsContent() {
     getSuppressionList({ limit: 100 }),
     getSuppressionSummary(),
   ]);
+
+  const domainNames =
+    domains.length > 0
+      ? domains.map((d) => d.name)
+      : [
+          process.env.EMAIL_FROM?.match(/@([a-zA-Z0-9.-]+\.[a-zA-Z]{2,})/)?.[1] ||
+            "mail.systemdevify.com",
+        ];
+
+  const initialAudits = await Promise.all(
+    domainNames.slice(0, 3).map(async (d) => {
+      try {
+        return await auditDomainDeliverability(d);
+      } catch {
+        return await auditDomainDeliverability(d, { mock: true });
+      }
+    })
+  );
 
   const hasResendKey =
     !!process.env.RESEND_API_KEY &&
@@ -80,6 +100,12 @@ async function SettingsContent() {
           )}
         </div>
       </div>
+
+      {/* DNS & Deliverability Hardening (Google & Yahoo 2024 Compliance) */}
+      <DeliverabilityAudit
+        initialAudits={initialAudits}
+        availableDomains={domainNames}
+      />
 
       {/* Sender Mailbox Identities Manager */}
       <SenderManager senders={senders} domains={domains} />

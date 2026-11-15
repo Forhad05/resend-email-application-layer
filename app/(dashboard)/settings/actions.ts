@@ -69,3 +69,17 @@ export async function setDefaultSenderIdentityAction(id: string) {
   }
 }
 
+export async function runDomainAuditAction(domain: string) {
+  try {
+    const { auditDomainDeliverability } = await import("@/lib/email/dns");
+    const result = await auditDomainDeliverability(domain);
+    return { success: true, result };
+  } catch (err: unknown) {
+    console.error("Error running DNS audit:", err);
+    return {
+      success: false,
+      error: err instanceof Error ? err.message : "Failed to audit domain DNS.",
+    };
+  }
+}
+

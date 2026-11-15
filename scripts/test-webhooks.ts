@@ -60,7 +60,7 @@ async function cleanupSimulationRecords(params?: {
     // Exhaustive safety sweep: clear any simulation.local contacts, audits, messages, or threads
     await db.delete(contacts).where(sql`email LIKE '%simulation.local%'`);
     await db.delete(auditLogs).where(
-      sql`details::text LIKE '%simulation.local%' OR entity_id LIKE '%simulation.local%'`
+      sql`details::text LIKE '%simulation.local%' OR details::text LIKE '%Production database cluster unavailable%' OR entity_id LIKE '%simulation.local%'`
     );
     await db.delete(messages).where(sql`from_email LIKE '%simulation.local%'`);
     await db.delete(threads).where(sql`subject LIKE '%Production database cluster unavailable%'`);

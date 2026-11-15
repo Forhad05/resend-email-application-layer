@@ -941,7 +941,8 @@ Open [http://localhost:3000](http://localhost:3000) in your browser. Default tem
 | `npm run test:webhooks` | Simulates inbound threading, delivery events, and bounce suppression. |
 | `npm run test:stress` | Runs 50 parallel webhook bursts, 429 rate-limiting, and pool benchmarks. |
 | `npm run test:fuzz` | Tests Brotli shield, path traversal, XSS, and SQL injection resistance. |
-| `npm run test:all` | Executes all 56 automated tests back-to-back with zero residual leaks. |
+| `npm run test:all` | Executes all 57 automated tests back-to-back with zero residual leaks. |
+| `npm run verify:dns` | Audits SPF, DKIM, DMARC, MX records and outputs 21-day warm-up roadmap. |
 
 ---
 

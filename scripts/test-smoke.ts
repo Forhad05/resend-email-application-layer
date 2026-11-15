@@ -321,6 +321,34 @@ async function runSmokeTests() {
   }
 
   // ============================================================================
+  // 6. Deliverability & DNS Hardening Audit
+  // ============================================================================
+  try {
+    const { auditDomainDeliverability } = await import("../lib/email/dns");
+    const { durationMs, result: audit } = await measure(async () => {
+      return await auditDomainDeliverability("mail.systemdevify.com", { mock: true });
+    });
+
+    const isScoreValid = audit.compliance.score === 100 && audit.checks.length === 4;
+    results.push({
+      category: "Deliverability",
+      name: "DNS Audit Engine & 2024 Compliance Evaluator",
+      passed: isScoreValid,
+      durationMs,
+      details: `Score: ${audit.compliance.score}/100 | ${audit.checks.length} pillars verified | ${audit.warmupSchedule.length} warm-up tiers`,
+      error: isScoreValid ? undefined : "Audit returned invalid score or incomplete checks",
+    });
+  } catch (err) {
+    results.push({
+      category: "Deliverability",
+      name: "DNS Audit Engine & 2024 Compliance Evaluator",
+      passed: false,
+      durationMs: 0,
+      error: err instanceof Error ? err.message : String(err),
+    });
+  }
+
+  // ============================================================================
   // Clean Up Database Connection Pool
   // ============================================================================
   try {
