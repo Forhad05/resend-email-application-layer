@@ -42,6 +42,18 @@ services:
     networks:
       - email-network
 
+  tunnel:
+    image: docker.io/cloudflare/cloudflared:latest
+    container_name: email-tool-tunnel
+    restart: unless-stopped
+    env_file:
+      - .env.local
+    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    depends_on:
+      - web
+    networks:
+      - email-network
+
 volumes:
   postgres_data:
     driver: local

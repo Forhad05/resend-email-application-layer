@@ -13,6 +13,9 @@
     "docker:up": "docker compose up -d",
     "docker:down": "docker compose down",
     "docker:build": "docker compose build",
+    "tunnel:start": "docker compose up -d tunnel",
+    "tunnel:stop": "docker compose stop tunnel",
+    "tunnel:logs": "docker compose logs -f tunnel",
     "build": "next build",
     "start": "next start",
     "lint": "eslint"
