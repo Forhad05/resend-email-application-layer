@@ -10,6 +10,7 @@ import {
 import { eq, desc } from "drizzle-orm";
 import { checkOutboundRateLimit } from "@/lib/email/rate-limit";
 import { OutboundAttachment } from "@/lib/email/attachments";
+import { logAuditEvent } from "@/lib/audit";
 
 export interface ReplyEmailParams {
   threadId: string;
@@ -227,6 +228,21 @@ export async function replyToThread({
         updatedAt: new Date(),
       })
       .where(eq(threads.id, thread.id));
+
+    // 9. Log audit event
+    await logAuditEvent({
+      actor: sentByUserId ? { id: sentByUserId } : undefined,
+      action: "thread.reply_sent",
+      entityType: "thread",
+      entityId: thread.id,
+      details: {
+        messageId: newMessage.id,
+        resendId: resendData?.id,
+        recipient: thread.contactEmail,
+        hasAttachments: Boolean(attachments && attachments.length > 0),
+        attachmentCount: attachments?.length || 0,
+      },
+    });
 
     return {
       success: true,

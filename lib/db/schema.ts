@@ -354,6 +354,32 @@ export const rateLimits = pgTable(
   (table) => [index("idx_rate_limits_reset_at").on(table.resetAt)]
 );
 
+// System & Team Audit Log
+export const auditLogs = pgTable(
+  "audit_logs",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    actorId: text("actor_id"),
+    actorEmail: text("actor_email"),
+    actorName: text("actor_name"),
+    action: text("action").notNull(),
+    entityType: text("entity_type").notNull(),
+    entityId: text("entity_id").notNull(),
+    details: jsonb("details").default({}),
+    ipAddress: text("ip_address"),
+    userAgent: text("user_agent"),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_audit_logs_entity").on(table.entityType, table.entityId),
+    index("idx_audit_logs_actor_id").on(table.actorId),
+    index("idx_audit_logs_action").on(table.action),
+    index("idx_audit_logs_created_at").on(table.createdAt),
+  ]
+);
+
 // ==============================================================================
 // DRIZZLE RELATIONS
 // ==============================================================================
@@ -363,6 +389,7 @@ export const userRelations = relations(user, ({ many }) => ({
   sentMessages: many(messages),
   internalNotes: many(internalNotes),
   createdTemplates: many(templates),
+  auditLogs: many(auditLogs),
 }));
 
 export const contactsRelations = relations(contacts, ({ many }) => ({
@@ -408,6 +435,13 @@ export const internalNotesRelations = relations(internalNotes, ({ one }) => ({
   }),
   author: one(user, {
     fields: [internalNotes.authorId],
+    references: [user.id],
+  }),
+}));
+
+export const auditLogsRelations = relations(auditLogs, ({ one }) => ({
+  actor: one(user, {
+    fields: [auditLogs.actorId],
     references: [user.id],
   }),
 }));

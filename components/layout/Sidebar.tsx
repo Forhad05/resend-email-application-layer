@@ -11,6 +11,7 @@ import {
   BarChart2,
   Settings,
   Mail,
+  ShieldCheck,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
 import { getUnreadCountAction } from "@/lib/email/inbox-actions";
@@ -21,6 +22,7 @@ const navigation = [
   { name: "Templates", href: "/templates", icon: FileText },
   { name: "Contacts", href: "/contacts", icon: Users },
   { name: "Analytics", href: "/analytics", icon: BarChart2 },
+  { name: "Audit Log", href: "/audit", icon: ShieldCheck },
   { name: "Settings", href: "/settings", icon: Settings },
 ];
 

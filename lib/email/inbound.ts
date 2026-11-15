@@ -9,6 +9,7 @@ import {
 import { eq, or, sql, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import PostalMime from "postal-mime";
+import { logAuditEvent } from "@/lib/audit";
 
 export interface ResendInboundPayload {
   email_id?: string;
@@ -347,6 +348,18 @@ export async function handleDeliveryEvent(
             source: `resend_webhook_${normalizedStatus}`,
           })
           .onConflictDoNothing();
+
+        await logAuditEvent({
+          actor: { id: null, name: "System (Webhook)", email: "webhook@resend.com" },
+          action: "suppression.added",
+          entityType: "suppression",
+          entityId: cleanRecip,
+          details: {
+            reason: normalizedStatus === "bounced" ? "hard_bounce" : "complaint",
+            source: `resend_webhook_${normalizedStatus}`,
+            resendEmailId: emailId,
+          },
+        });
       } catch (err) {
         console.warn("Could not record suppression:", err);
       }

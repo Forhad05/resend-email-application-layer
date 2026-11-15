@@ -8,6 +8,7 @@ import {
   isReactEmailSupported,
   renderReactEmailBySlug,
 } from "./react-email";
+import { logAuditEvent } from "@/lib/audit";
 
 export interface SendTransactionalParams {
   to: string | string[];
@@ -186,6 +187,18 @@ export async function sendTransactionalEmail({
         status: "sent",
       })
       .returning();
+
+    await logAuditEvent({
+      action: "transactional.sent",
+      entityType: "thread",
+      entityId: newThread.id,
+      details: {
+        templateSlug,
+        recipient: primaryRecipient,
+        resendEmailId: resendData.id,
+        useReactEmail: useReactEmail !== false && isReactEmailSupported(templateSlug),
+      },
+    });
 
     return {
       success: true,

@@ -16,6 +16,8 @@ import { ThreadComposerTabs } from "@/components/inbox/ThreadComposerTabs";
 import { ThreadLiveRefresher } from "@/components/inbox/ThreadLiveRefresher";
 import { ThreadWorkflowControls } from "@/components/inbox/ThreadWorkflowControls";
 import { DeliveryStatusBadge } from "@/components/inbox/DeliveryStatusBadge";
+import { AuditTimelineItem } from "@/components/audit/AuditTimelineItem";
+import { getThreadAuditLogs } from "@/lib/audit";
 import {
   ArrowLeft,
   Clock,
@@ -52,6 +54,15 @@ type TimelineItem =
       content: string;
       authorName: string | null;
       authorEmail: string | null;
+    }
+  | {
+      type: "audit";
+      id: string;
+      createdAt: Date;
+      action: string;
+      actorName: string | null;
+      actorEmail: string | null;
+      details: Record<string, unknown> | null;
     };
 
 async function ThreadDetails({
@@ -78,7 +89,7 @@ async function ThreadDetails({
     .where(eq(suppressions.email, thread.contactEmail.toLowerCase()))
     .limit(1);
 
-  const [teamMembers, templateList, messageList] = await Promise.all([
+  const [teamMembers, templateList, messageList, auditLogList] = await Promise.all([
     getTeamMembers(),
     getTemplates(),
     db
@@ -86,6 +97,7 @@ async function ThreadDetails({
       .from(messages)
       .where(eq(messages.threadId, threadId))
       .orderBy(asc(messages.createdAt)),
+    getThreadAuditLogs(threadId),
   ]);
 
   const messageIds = messageList.map((m) => m.id);
@@ -117,7 +129,7 @@ async function ThreadDetails({
     .where(eq(internalNotes.threadId, threadId))
     .orderBy(asc(internalNotes.createdAt));
 
-  // Merge messages and internal notes into a chronological timeline
+  // Merge messages, internal notes, and audit events into a chronological timeline
   const timeline: TimelineItem[] = [
     ...messageList.map((m) => ({
       type: "message" as const,
@@ -139,6 +151,15 @@ async function ThreadDetails({
       content: n.content,
       authorName: n.authorName,
       authorEmail: n.authorEmail,
+    })),
+    ...auditLogList.map((a) => ({
+      type: "audit" as const,
+      id: a.id,
+      createdAt: a.createdAt,
+      action: a.action,
+      actorName: a.actorName,
+      actorEmail: a.actorEmail,
+      details: (a.details as Record<string, unknown>) || null,
     })),
   ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
@@ -199,9 +220,23 @@ async function ThreadDetails({
         />
       </div>
 
-      {/* Chronological Timeline: Messages + Team Internal Notes */}
+      {/* Chronological Timeline: Messages + Team Internal Notes + Audit Events */}
       <div className="space-y-4">
         {timeline.map((item) => {
+          if (item.type === "audit") {
+            return (
+              <AuditTimelineItem
+                key={item.id}
+                id={item.id}
+                action={item.action}
+                actorName={item.actorName}
+                actorEmail={item.actorEmail}
+                details={item.details}
+                createdAt={item.createdAt}
+              />
+            );
+          }
+
           if (item.type === "note") {
             return (
               <div

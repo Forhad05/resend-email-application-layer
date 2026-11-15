@@ -11,6 +11,7 @@ import {
 import { inArray, eq } from "drizzle-orm";
 import { checkOutboundRateLimit } from "@/lib/email/rate-limit";
 import { OutboundAttachment } from "@/lib/email/attachments";
+import { logAuditEvent } from "@/lib/audit";
 
 export interface SendEmailParams {
   to: string[];
@@ -228,6 +229,21 @@ export async function sendEmail({
         });
       }
     }
+
+    // 9. Record audit event
+    await logAuditEvent({
+      actor: sentByUserId ? { id: sentByUserId } : undefined,
+      action: "thread.created",
+      entityType: "thread",
+      entityId: newThread.id,
+      details: {
+        subject,
+        recipients: cleanedTo,
+        messageId: newMessage.id,
+        resendId: resendData?.id,
+        hasAttachments: Boolean(attachments && attachments.length > 0),
+      },
+    });
 
     return {
       success: true,

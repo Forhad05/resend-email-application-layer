@@ -12,6 +12,7 @@ import {
   formatFileSize,
   OutboundAttachment,
 } from "@/lib/email/attachments";
+import { logAuditEvent } from "@/lib/audit";
 
 export async function replyAction(
   threadIdOrFormData: string | FormData,
@@ -141,6 +142,12 @@ export async function updateThreadStatusAction(
   status: "open" | "pending" | "resolved" | "closed"
 ) {
   try {
+    const [current] = await db
+      .select({ status: threads.status })
+      .from(threads)
+      .where(eq(threads.id, threadId))
+      .limit(1);
+
     await db
       .update(threads)
       .set({
@@ -148,6 +155,16 @@ export async function updateThreadStatusAction(
         updatedAt: new Date(),
       })
       .where(eq(threads.id, threadId));
+
+    await logAuditEvent({
+      action: "thread.status_updated",
+      entityType: "thread",
+      entityId: threadId,
+      details: {
+        previousStatus: current?.status || "unknown",
+        newStatus: status,
+      },
+    });
 
     revalidatePath(`/inbox/${threadId}`);
     revalidatePath("/inbox");
@@ -163,6 +180,12 @@ export async function updateThreadPriorityAction(
   priority: "low" | "normal" | "high" | "urgent"
 ) {
   try {
+    const [current] = await db
+      .select({ priority: threads.priority })
+      .from(threads)
+      .where(eq(threads.id, threadId))
+      .limit(1);
+
     await db
       .update(threads)
       .set({
@@ -170,6 +193,16 @@ export async function updateThreadPriorityAction(
         updatedAt: new Date(),
       })
       .where(eq(threads.id, threadId));
+
+    await logAuditEvent({
+      action: "thread.priority_updated",
+      entityType: "thread",
+      entityId: threadId,
+      details: {
+        previousPriority: current?.priority || "normal",
+        newPriority: priority,
+      },
+    });
 
     revalidatePath(`/inbox/${threadId}`);
     revalidatePath("/inbox");
@@ -185,6 +218,12 @@ export async function updateThreadAssigneeAction(
   assignedTo: string | null
 ) {
   try {
+    const [current] = await db
+      .select({ assignedTo: threads.assignedTo })
+      .from(threads)
+      .where(eq(threads.id, threadId))
+      .limit(1);
+
     await db
       .update(threads)
       .set({
@@ -192,6 +231,16 @@ export async function updateThreadAssigneeAction(
         updatedAt: new Date(),
       })
       .where(eq(threads.id, threadId));
+
+    await logAuditEvent({
+      action: "thread.assigned",
+      entityType: "thread",
+      entityId: threadId,
+      details: {
+        previousAssigneeId: current?.assignedTo || null,
+        newAssigneeId: assignedTo || null,
+      },
+    });
 
     revalidatePath(`/inbox/${threadId}`);
     revalidatePath("/inbox");
@@ -218,11 +267,14 @@ export async function createInternalNoteAction(
       effectiveAuthorId = team[0]?.id || "user_apon_01";
     }
 
-    await db.insert(internalNotes).values({
-      threadId,
-      authorId: effectiveAuthorId,
-      content: content.trim(),
-    });
+    const [newNote] = await db
+      .insert(internalNotes)
+      .values({
+        threadId,
+        authorId: effectiveAuthorId,
+        content: content.trim(),
+      })
+      .returning({ id: internalNotes.id });
 
     await db
       .update(threads)
@@ -230,6 +282,17 @@ export async function createInternalNoteAction(
         updatedAt: new Date(),
       })
       .where(eq(threads.id, threadId));
+
+    await logAuditEvent({
+      actor: effectiveAuthorId ? { id: effectiveAuthorId } : undefined,
+      action: "thread.note_added",
+      entityType: "thread",
+      entityId: threadId,
+      details: {
+        noteId: newNote?.id,
+        preview: content.trim().slice(0, 100),
+      },
+    });
 
     revalidatePath(`/inbox/${threadId}`);
     return { success: true };

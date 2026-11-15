@@ -9,6 +9,7 @@ import {
   isReactEmailSupported,
   renderReactEmailBySlug,
 } from "@/lib/email/react-email";
+import { logAuditEvent } from "@/lib/audit";
 
 export async function createTemplateAction(data: {
   name: string;
@@ -24,14 +25,28 @@ export async function createTemplateAction(data: {
       return { success: false, error: "A valid unique slug is required." };
     }
 
-    await db.insert(templates).values({
-      name: data.name.trim(),
-      slug,
-      subject: data.subject.trim(),
-      description: data.description?.trim() || null,
-      textBody: data.textBody.trim(),
-      htmlBody: data.htmlBody?.trim() || null,
-      isActive: true,
+    const [created] = await db
+      .insert(templates)
+      .values({
+        name: data.name.trim(),
+        slug,
+        subject: data.subject.trim(),
+        description: data.description?.trim() || null,
+        textBody: data.textBody.trim(),
+        htmlBody: data.htmlBody?.trim() || null,
+        isActive: true,
+      })
+      .returning({ id: templates.id });
+
+    await logAuditEvent({
+      action: "template.created",
+      entityType: "template",
+      entityId: created?.id || slug,
+      details: {
+        name: data.name.trim(),
+        slug,
+        subject: data.subject.trim(),
+      },
     });
 
     revalidatePath("/templates");
@@ -65,6 +80,16 @@ export async function updateTemplateAction(
       })
       .where(eq(templates.id, id));
 
+    await logAuditEvent({
+      action: "template.updated",
+      entityType: "template",
+      entityId: id,
+      details: {
+        name: data.name.trim(),
+        subject: data.subject.trim(),
+      },
+    });
+
     revalidatePath("/templates");
     return { success: true };
   } catch (err: unknown) {
@@ -75,7 +100,24 @@ export async function updateTemplateAction(
 
 export async function deleteTemplateAction(id: string) {
   try {
+    const [existing] = await db
+      .select({ name: templates.name, slug: templates.slug })
+      .from(templates)
+      .where(eq(templates.id, id))
+      .limit(1);
+
     await db.delete(templates).where(eq(templates.id, id));
+
+    await logAuditEvent({
+      action: "template.deleted",
+      entityType: "template",
+      entityId: id,
+      details: {
+        name: existing?.name,
+        slug: existing?.slug,
+      },
+    });
+
     revalidatePath("/templates");
     return { success: true };
   } catch (err: unknown) {
