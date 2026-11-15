@@ -19,12 +19,14 @@ services:
       timeout: 5s
       retries: 5
     networks:
-      - email-network
+      email-network:
+        ipv4_address: 10.89.0.2
 
   web:
     build:
       context: .
       dockerfile: Dockerfile
+    image: systemdevify/resend-email-app:latest
     container_name: email-tool-web
     restart: unless-stopped
     ports:
@@ -36,6 +38,13 @@ services:
       DATABASE_URL: postgresql://${POSTGRES_USER:-postgres}:${POSTGRES_PASSWORD:-postgres}@postgres:5432/${POSTGRES_DB:-email_tool}
       PORT: 3000
       HOSTNAME: "0.0.0.0"
+    extra_hosts:
+      - "postgres:10.89.0.2"
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
+    volumes:
+      - uploads_data:/app/uploads
     depends_on:
       postgres:
         condition: service_healthy
@@ -48,7 +57,10 @@ services:
     restart: unless-stopped
     env_file:
       - .env.local
-    command: tunnel --no-autoupdate run --token ${CLOUDFLARE_TUNNEL_TOKEN}
+    command: tunnel --no-autoupdate run
+    dns:
+      - 1.1.1.1
+      - 8.8.8.8
     depends_on:
       - web
     networks:
@@ -57,8 +69,13 @@ services:
 volumes:
   postgres_data:
     driver: local
+  uploads_data:
+    driver: local
 
 networks:
   email-network:
     driver: bridge
+    ipam:
+      config:
+        - subnet: 10.89.0.0/24
 

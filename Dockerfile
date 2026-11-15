@@ -1,5 +1,5 @@
 # Multi-stage Dockerfile for Next.js 16 (Standalone Output)
-FROM node:20-alpine AS base
+FROM docker.io/library/node:20-alpine AS base
 
 # 1. Install dependencies only when needed
 FROM base AS deps
@@ -37,8 +37,8 @@ RUN addgroup --system --gid 1001 nodejs && \
 
 COPY --from=builder /app/public ./public
 
-# Set the correct permissions for runtime cache
-RUN mkdir .next && chown nextjs:nodejs .next
+# Set the correct permissions for runtime cache and attachment storage
+RUN mkdir -p .next uploads/attachments && chown -R nextjs:nodejs .next uploads
 
 # Automatically leverage output traces to reduce image size
 COPY --from=builder --chown=nextjs:nodejs /app/.next/standalone ./
