@@ -123,16 +123,23 @@ export async function getDeliverabilityMetrics(): Promise<DeliverabilityMetricsR
       opened: number;
       bounced: number;
     }>(sql`
+      WITH unnested AS (
+        SELECT 
+          LOWER(split_part(recipient, '@', 2)) AS domain,
+          status
+        FROM messages,
+        unnest(to_emails) AS recipient
+        WHERE direction = 'outbound'
+      )
       SELECT 
-        LOWER(split_part(unnest(to_emails), '@', 2)) AS domain,
+        domain,
         COUNT(*)::int AS sent,
         COUNT(CASE WHEN status IN ('delivered', 'opened', 'clicked') THEN 1 END)::int AS delivered,
         COUNT(CASE WHEN status IN ('opened', 'clicked') THEN 1 END)::int AS opened,
         COUNT(CASE WHEN status = 'bounced' THEN 1 END)::int AS bounced
-      FROM messages
-      WHERE direction = 'outbound'
+      FROM unnested
+      WHERE domain IS NOT NULL AND domain <> ''
       GROUP BY domain
-      HAVING LOWER(split_part(unnest(to_emails), '@', 2)) <> ''
       ORDER BY sent DESC
       LIMIT 10
     `);

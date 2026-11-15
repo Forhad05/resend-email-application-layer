@@ -119,10 +119,10 @@ export async function removeSuppressionAction(
         process.env.RESEND_API_KEY &&
         !process.env.RESEND_API_KEY.startsWith("re_placeholder")
       ) {
-        // Resend SDK suppressions remove
-        await (resend.suppressions as unknown as { remove: (params: { email: string }) => Promise<unknown> }).remove({
-          email: cleanEmail,
-        });
+        // Resend SDK suppressions remove takes email string as first param
+        await (resend.suppressions as unknown as { remove: (idOrEmail: string) => Promise<unknown> }).remove(
+          cleanEmail
+        );
       }
     } catch (resendErr) {
       console.warn("Resend API suppression remove warning (non-fatal):", resendErr);
@@ -193,7 +193,21 @@ export async function addSuppressionAction(
         },
       });
 
-    // 2. Log audit activity
+    // 2. Attempt addition to Resend SDK if configured
+    try {
+      if (
+        process.env.RESEND_API_KEY &&
+        !process.env.RESEND_API_KEY.startsWith("re_placeholder")
+      ) {
+        await (resend.suppressions as unknown as { add: (params: { email: string }) => Promise<unknown> }).add({
+          email: cleanEmail,
+        });
+      }
+    } catch (resendErr) {
+      console.warn("Resend API suppression add warning (non-fatal):", resendErr);
+    }
+
+    // 3. Log audit activity
     await logAuditEvent({
       actor: {
         id: session.user.id,

@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition, useMemo, useEffect } from "react";
+import { useState, useTransition, useMemo, useEffect, useRef } from "react";
 import { SuppressionItem, SuppressionSummary } from "@/lib/email/suppression";
 import {
   removeSuppressionAction,
@@ -30,6 +30,14 @@ export function SuppressionManager({
   summary,
 }: SuppressionManagerProps) {
   const [items, setItems] = useState<SuppressionItem[]>(initialSuppressions);
+  const [prevInitial, setPrevInitial] = useState(initialSuppressions);
+
+  // Synchronize state with incoming server revalidations
+  if (prevInitial !== initialSuppressions) {
+    setPrevInitial(initialSuppressions);
+    setItems(initialSuppressions);
+  }
+
   const [searchTerm, setSearchTerm] = useState("");
   const [reasonFilter, setReasonFilter] = useState("all");
   const [showAddModal, setShowAddModal] = useState(false);
@@ -39,8 +47,9 @@ export function SuppressionManager({
   const [actionSuccess, setActionSuccess] = useState<string | null>(null);
   const [isPending, startTransition] = useTransition();
   const [removingEmail, setRemovingEmail] = useState<string | null>(null);
+  const alertTimerRef = useRef<NodeJS.Timeout | null>(null);
 
-  // Keyboard accessibility: Escape to dismiss add modal
+  // Auto-dismiss cleanup & Escape key listener
   useEffect(() => {
     function handleKeyDown(e: KeyboardEvent) {
       if (e.key === "Escape" && showAddModal) {
@@ -48,7 +57,10 @@ export function SuppressionManager({
       }
     }
     window.addEventListener("keydown", handleKeyDown);
-    return () => window.removeEventListener("keydown", handleKeyDown);
+    return () => {
+      window.removeEventListener("keydown", handleKeyDown);
+      if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
+    };
   }, [showAddModal]);
 
   const filteredItems = useMemo(() => {
@@ -89,6 +101,8 @@ export function SuppressionManager({
 
       if (res.success) {
         setActionSuccess(`Successfully unsuppressed "${email}". Outbound messaging restored.`);
+        if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
+        alertTimerRef.current = setTimeout(() => setActionSuccess(null), 4000);
         setItems((prev) => prev.filter((i) => i.email !== email));
       } else {
         setActionError(res.error || "Failed to remove suppression.");
@@ -110,6 +124,8 @@ export function SuppressionManager({
       const res = await addSuppressionAction(addEmail.trim(), addReason);
       if (res.success) {
         setActionSuccess(`Suppression added for "${addEmail.trim()}". Outbound sends blocked.`);
+        if (alertTimerRef.current) clearTimeout(alertTimerRef.current);
+        alertTimerRef.current = setTimeout(() => setActionSuccess(null), 4000);
         setItems((prev) => [
           {
             id: crypto.randomUUID(),
@@ -324,7 +340,12 @@ export function SuppressionManager({
 
       {/* Add Suppression Modal */}
       {showAddModal && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200">
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-xs animate-in fade-in duration-200"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setShowAddModal(false);
+          }}
+        >
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl w-full max-w-md shadow-2xl overflow-hidden">
             <div className="flex items-center justify-between px-6 py-4 border-b border-zinc-200 dark:border-zinc-800">
               <div className="flex items-center gap-2">
