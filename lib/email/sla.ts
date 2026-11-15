@@ -1,6 +1,5 @@
 import { db } from "@/lib/db";
-import { threads } from "@/lib/db/schema";
-import { eq, or, and, lte } from "drizzle-orm";
+import { sql } from "drizzle-orm";
 import { logAuditEvent } from "@/lib/audit";
 
 export * from "./sla-utils";
@@ -11,53 +10,58 @@ export interface EscalationSummary {
 }
 
 /**
- * Scans active tickets, flags breached deadlines, auto-elevates priority, and logs audit events
+ * Scans active tickets, flags breached deadlines, auto-elevates priority atomically, and logs audit events.
+ * Uses atomic CTE with FOR UPDATE SKIP LOCKED to prevent race conditions and pool starvation.
  */
-export async function evaluateAndEscalateBreachedSlas(): Promise<EscalationSummary> {
+export async function evaluateAndEscalateBreachedSlas(
+  limitCount: number = 25
+): Promise<EscalationSummary> {
   const now = new Date();
 
-  // Find open or pending threads whose SLA deadline has passed and are not yet marked breached
-  const breachedThreads = await db
-    .select({
-      id: threads.id,
-      subject: threads.subject,
-      priority: threads.priority,
-      slaDueAt: threads.slaDueAt,
-      contactEmail: threads.contactEmail,
-    })
-    .from(threads)
-    .where(
-      and(
-        or(eq(threads.status, "open"), eq(threads.status, "pending")),
-        lte(threads.slaDueAt, now),
-        eq(threads.slaBreached, false)
-      )
-    );
+  // Atomic batch escalation using CTE and FOR UPDATE SKIP LOCKED
+  const result = await db.execute<{
+    id: string;
+    subject: string;
+    priority: string;
+    old_priority: string;
+    sla_due_at: Date | string | null;
+    contact_email: string;
+  }>(sql`
+    WITH to_escalate AS (
+      SELECT id, priority, sla_due_at, subject, contact_email
+      FROM threads
+      WHERE (status = 'open' OR status = 'pending')
+        AND sla_due_at <= ${now}
+        AND sla_breached = false
+      ORDER BY sla_due_at ASC
+      LIMIT ${limitCount}
+      FOR UPDATE SKIP LOCKED
+    ),
+    updated AS (
+      UPDATE threads t
+      SET 
+        sla_breached = true,
+        priority = CASE 
+          WHEN t.priority = 'low' THEN 'normal'
+          WHEN t.priority = 'normal' THEN 'high'
+          ELSE 'urgent'
+        END,
+        updated_at = ${now}
+      FROM to_escalate te
+      WHERE t.id = te.id
+      RETURNING t.id, t.subject, t.priority, te.priority AS old_priority, te.sla_due_at, t.contact_email
+    )
+    SELECT * FROM updated;
+  `);
 
-  const escalatedThreadIds: string[] = [];
+  const escalatedRows = result.rows || [];
+  const escalatedThreadIds = escalatedRows.map((r) => r.id);
 
-  for (const t of breachedThreads) {
-    let newPriority: "low" | "normal" | "high" | "urgent" = "urgent";
-    if (t.priority === "low") newPriority = "normal";
-    else if (t.priority === "normal") newPriority = "high";
-    else if (t.priority === "high" || t.priority === "urgent") newPriority = "urgent";
-
-    const overdueMinutes = t.slaDueAt
-      ? Math.round((now.getTime() - new Date(t.slaDueAt).getTime()) / (1000 * 60))
+  for (const r of escalatedRows) {
+    const overdueMinutes = r.sla_due_at
+      ? Math.round((now.getTime() - new Date(r.sla_due_at).getTime()) / (1000 * 60))
       : 0;
 
-    await db
-      .update(threads)
-      .set({
-        slaBreached: true,
-        priority: newPriority,
-        updatedAt: now,
-      })
-      .where(eq(threads.id, t.id));
-
-    escalatedThreadIds.push(t.id);
-
-    // Audit log escalation event
     await logAuditEvent({
       actor: {
         id: "system",
@@ -66,15 +70,15 @@ export async function evaluateAndEscalateBreachedSlas(): Promise<EscalationSumma
       },
       action: "sla.breached",
       entityType: "thread",
-      entityId: t.id,
+      entityId: r.id,
       details: {
-        subject: t.subject,
-        oldPriority: t.priority,
-        newPriority,
+        subject: r.subject,
+        oldPriority: r.old_priority,
+        newPriority: r.priority,
         overdueMinutes,
-        contactEmail: t.contactEmail,
+        contactEmail: r.contact_email,
       },
-    });
+    }).catch((err) => console.warn("Failed to log SLA audit event:", err));
   }
 
   return {

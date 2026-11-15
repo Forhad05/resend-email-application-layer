@@ -269,7 +269,7 @@ export async function handleInboundEmail(data: ResendInboundPayload) {
           matchedRules: triage.matchedRules,
           subject,
         },
-      });
+      }).catch((err) => console.warn("Auto-triage audit log warning:", err));
     }
   } else {
     // Fetch existing thread to merge labels and respect higher priority
@@ -322,7 +322,7 @@ export async function handleInboundEmail(data: ResendInboundPayload) {
           matchedRules: triage.matchedRules,
           subject,
         },
-      });
+      }).catch((err) => console.warn("Auto-triage audit log warning:", err));
     }
   }
 

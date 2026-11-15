@@ -229,7 +229,9 @@ export function InboxThreadView({
           e.preventDefault();
           const target = filteredThreads[selectedIndex];
           const newStatus = target.status === "resolved" ? "open" : "resolved";
-          updateThreadStatusAction(target.id, newStatus);
+          updateThreadStatusAction(target.id, newStatus).catch((err) =>
+            console.error("Failed to update status via shortcut:", err)
+          );
         }
       }
     }
