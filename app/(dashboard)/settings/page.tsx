@@ -1,14 +1,18 @@
 import { Suspense } from "react";
 import { getSenderIdentities, getResendDomains } from "@/lib/email/senders";
+import { getSuppressionList, getSuppressionSummary } from "@/lib/email/suppression";
 import { SenderManager } from "./SenderManager";
+import { SuppressionManager } from "./SuppressionManager";
 import { Key, Server, Shield, Globe, CheckCircle2, AlertTriangle, Loader2 } from "lucide-react";
 import { connection } from "next/server";
 
 async function SettingsContent() {
   await connection();
-  const [senders, domains] = await Promise.all([
+  const [senders, domains, suppressionsList, suppressionSummary] = await Promise.all([
     getSenderIdentities(),
     getResendDomains(),
+    getSuppressionList({ limit: 100 }),
+    getSuppressionSummary(),
   ]);
 
   const hasResendKey =
@@ -79,6 +83,12 @@ async function SettingsContent() {
 
       {/* Sender Mailbox Identities Manager */}
       <SenderManager senders={senders} domains={domains} />
+
+      {/* Suppression List & Deliverability Guard */}
+      <SuppressionManager
+        initialSuppressions={suppressionsList}
+        summary={suppressionSummary}
+      />
 
       {/* System Status Overview */}
       <div className="space-y-4">
