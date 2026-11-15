@@ -27,6 +27,7 @@ export function ThreadLiveRefresher({
 
   const messageCountRef = useRef(initialMessageCount);
   const lastMessageAtRef = useRef(initialLastMessageAt);
+  const toastTimerRef = useRef<NodeJS.Timeout | null>(null);
 
   // Update refs when props change
   useEffect(() => {
@@ -61,7 +62,8 @@ export function ThreadLiveRefresher({
           router.refresh();
 
           // Auto-hide toast after 5s
-          setTimeout(() => {
+          if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
+          toastTimerRef.current = setTimeout(() => {
             setNewActivityToast(false);
           }, 5000);
         }
@@ -84,6 +86,7 @@ export function ThreadLiveRefresher({
     return () => {
       clearInterval(timer);
       window.removeEventListener("focus", onFocus);
+      if (toastTimerRef.current) clearTimeout(toastTimerRef.current);
     };
   }, [threadId, router]);
 

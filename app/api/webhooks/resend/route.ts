@@ -94,7 +94,7 @@ export async function POST(req: NextRequest) {
     const err = error as Error;
     console.error("Error processing Resend webhook:", err);
     return NextResponse.json(
-      { error: err.message || "Internal server error" },
+      { error: "Internal server error processing webhook" },
       { status: 500 }
     );
   }

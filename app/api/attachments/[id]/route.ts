@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { db } from "@/lib/db";
 import { attachments } from "@/lib/db/schema";
 import { eq, or } from "drizzle-orm";
+import { getServerSession } from "@/lib/auth-session";
 import fs from "fs/promises";
 import path from "path";
 
@@ -17,6 +18,12 @@ export async function GET(
 
   if (!id) {
     return new NextResponse("Attachment ID required", { status: 400 });
+  }
+
+  // Enforce session authentication to prevent unauthorized attachment downloads
+  const session = await getServerSession();
+  if (!session) {
+    return new NextResponse("Unauthorized: Authentication required", { status: 401 });
   }
 
   try {

@@ -41,9 +41,11 @@ export async function POST(request: Request) {
 
     return NextResponse.json(result, { status: 200 });
   } catch (err: unknown) {
-    const message =
-      err instanceof Error ? err.message : "Internal server error";
-    return NextResponse.json({ error: message }, { status: 500 });
+    console.error("Transactional send endpoint error:", err);
+    return NextResponse.json(
+      { error: "Internal server error" },
+      { status: 500 }
+    );
   }
 }
 

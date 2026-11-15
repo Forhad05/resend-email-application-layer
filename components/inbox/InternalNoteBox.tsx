@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useTransition } from "react";
+import { useState, useTransition, useRef, useEffect } from "react";
 import { createInternalNoteAction } from "@/app/(dashboard)/inbox/[threadId]/actions";
 import { Lock, Loader2, AlertCircle, Check } from "lucide-react";
 
@@ -13,6 +13,13 @@ export function InternalNoteBox({ threadId }: InternalNoteBoxProps) {
   const [error, setError] = useState<string | null>(null);
   const [success, setSuccess] = useState(false);
   const [isPending, startTransition] = useTransition();
+  const successTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (successTimerRef.current) clearTimeout(successTimerRef.current);
+    };
+  }, []);
 
   const handleAddNote = (e: React.FormEvent) => {
     e.preventDefault();
@@ -25,7 +32,8 @@ export function InternalNoteBox({ threadId }: InternalNoteBoxProps) {
       if (res.success) {
         setContent("");
         setSuccess(true);
-        setTimeout(() => setSuccess(false), 2500);
+        if (successTimerRef.current) clearTimeout(successTimerRef.current);
+        successTimerRef.current = setTimeout(() => setSuccess(false), 2500);
       } else {
         setError(res.error || "Failed to save internal note");
       }
