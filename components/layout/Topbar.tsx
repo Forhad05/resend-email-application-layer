@@ -35,7 +35,8 @@ export function Topbar() {
     } catch (err) {
       console.error("Sign out error:", err);
       // Fallback redirect
-      window.location.href = "/login";
+      router.push("/login");
+      router.refresh();
     }
   };
 

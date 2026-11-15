@@ -112,6 +112,26 @@ The {{company}} Security Team`,
   </p>
 </div>`,
   },
+  {
+    name: "System Notification",
+    slug: "transactional-notice",
+    subject: "{{heading}}",
+    description: "General transactional notification for system broadcasts and status updates.",
+    textBody: `Hi {{customer_name}},
+
+{{message}}
+
+Best regards,
+The {{company}} Team`,
+    htmlBody: `<div style="font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif; line-height: 1.6; color: #1f2937;">
+  <p>Hi <strong>{{customer_name}}</strong>,</p>
+  <p>{{message}}</p>
+  <p style="margin-top: 24px; border-top: 1px solid #e5e7eb; padding-top: 16px; color: #4b5563;">
+    Best regards,<br />
+    The {{company}} Team
+  </p>
+</div>`,
+  },
 ];
 
 /**
@@ -121,27 +141,30 @@ export async function getTemplates() {
   await connection();
   try {
     const existing = await db.select().from(templates);
-    if (existing.length > 0) {
-      return existing;
+
+    // Seed any missing default templates
+    const existingSlugs = new Set(existing.map((t) => t.slug));
+    const missing = DEFAULT_TEMPLATES.filter((t) => !existingSlugs.has(t.slug));
+
+    if (missing.length > 0) {
+      for (const tpl of missing) {
+        await db
+          .insert(templates)
+          .values({
+            name: tpl.name,
+            slug: tpl.slug,
+            subject: tpl.subject,
+            description: tpl.description,
+            textBody: tpl.textBody,
+            htmlBody: tpl.htmlBody,
+            isActive: true,
+          })
+          .onConflictDoNothing();
+      }
+      return await db.select().from(templates);
     }
 
-    // Auto-seed defaults
-    for (const tpl of DEFAULT_TEMPLATES) {
-      await db
-        .insert(templates)
-        .values({
-          name: tpl.name,
-          slug: tpl.slug,
-          subject: tpl.subject,
-          description: tpl.description,
-          textBody: tpl.textBody,
-          htmlBody: tpl.htmlBody,
-          isActive: true,
-        })
-        .onConflictDoNothing();
-    }
-
-    return await db.select().from(templates);
+    return existing;
   } catch (err: unknown) {
     console.error("Failed to fetch or seed email templates:", err);
     return [];
