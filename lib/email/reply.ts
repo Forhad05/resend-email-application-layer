@@ -11,6 +11,7 @@ import { eq, desc } from "drizzle-orm";
 import { checkOutboundRateLimit } from "@/lib/email/rate-limit";
 import { OutboundAttachment } from "@/lib/email/attachments";
 import { logAuditEvent } from "@/lib/audit";
+import { sanitizeErrorMessage } from "@/lib/utils";
 
 export interface ReplyEmailParams {
   threadId: string;
@@ -250,10 +251,8 @@ export async function replyToThread({
       resendId: resendData?.id,
     };
   } catch (err: unknown) {
-    const errorMsg =
-      err instanceof Error ? err.message : "Unexpected error sending reply";
     console.error("replyToThread failed:", err);
-    return { success: false, error: errorMsg };
+    return { success: false, error: sanitizeErrorMessage(err) };
   }
 }
 

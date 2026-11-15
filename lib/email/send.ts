@@ -12,6 +12,7 @@ import { inArray, eq } from "drizzle-orm";
 import { checkOutboundRateLimit } from "@/lib/email/rate-limit";
 import { OutboundAttachment } from "@/lib/email/attachments";
 import { logAuditEvent } from "@/lib/audit";
+import { sanitizeErrorMessage } from "@/lib/utils";
 
 export interface SendEmailParams {
   to: string[];
@@ -252,9 +253,8 @@ export async function sendEmail({
       resendId: resendData?.id,
     };
   } catch (err: unknown) {
-    const errorMsg = err instanceof Error ? err.message : "Unexpected error sending email";
     console.error("sendEmail failed:", err);
-    return { success: false, error: errorMsg };
+    return { success: false, error: sanitizeErrorMessage(err) };
   }
 }
 

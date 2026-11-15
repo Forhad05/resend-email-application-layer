@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, Suspense } from "react";
+import { useState, useRef, useEffect, Suspense } from "react";
 import { useRouter, useSearchParams } from "next/navigation";
 import { authClient } from "@/lib/auth-client";
 import {
@@ -28,6 +28,13 @@ function LoginForm() {
   const [isLoading, setIsLoading] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
+  const redirectTimerRef = useRef<NodeJS.Timeout | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+    };
+  }, []);
 
   const handleQuickFillDemo = () => {
     setMode("signin");
@@ -58,7 +65,8 @@ function LoginForm() {
         }
 
         setSuccessMessage("Authenticated successfully. Redirecting...");
-        setTimeout(() => {
+        if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+        redirectTimerRef.current = setTimeout(() => {
           router.push(callbackUrl);
           router.refresh();
         }, 400);
@@ -89,7 +97,8 @@ function LoginForm() {
         }
 
         setSuccessMessage("Account created successfully. Redirecting...");
-        setTimeout(() => {
+        if (redirectTimerRef.current) clearTimeout(redirectTimerRef.current);
+        redirectTimerRef.current = setTimeout(() => {
           router.push(callbackUrl);
           router.refresh();
         }, 500);

@@ -11,6 +11,7 @@ import {
 import { logAuditEvent } from "@/lib/audit";
 import { getServerSession } from "@/lib/auth-session";
 import { revalidatePath } from "next/cache";
+import { sanitizeErrorMessage } from "@/lib/utils";
 
 export interface RecordWebhookParams {
   svixId?: string | null;
@@ -132,13 +133,6 @@ export async function dispatchWebhookEvent(
 
     return { success: false, error: errorMsg };
   }
-}
-
-function sanitizeErrorMessage(msg: string): string {
-  const sanitized = msg
-    .replace(/postgresql:\/\/[^@\s]+@[^\s/]+/gi, "postgresql://[redacted]")
-    .replace(/\/home\/[^\s:]+/gi, "[internal path]");
-  return sanitized.length > 200 ? sanitized.slice(0, 200) + "..." : sanitized;
 }
 
 /**

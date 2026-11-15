@@ -17,6 +17,8 @@ export function Topbar() {
 
   // Close dropdown on click outside
   useEffect(() => {
+    if (!dropdownOpen) return;
+
     function handleClickOutside(event: MouseEvent) {
       if (
         dropdownRef.current &&
@@ -27,7 +29,7 @@ export function Topbar() {
     }
     document.addEventListener("mousedown", handleClickOutside);
     return () => document.removeEventListener("mousedown", handleClickOutside);
-  }, []);
+  }, [dropdownOpen]);
 
   const handleSignOut = async () => {
     try {

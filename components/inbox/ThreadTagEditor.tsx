@@ -51,13 +51,15 @@ export function ThreadTagEditor({
         setIsOpen(false);
       }
     }
+    let focusTimer: NodeJS.Timeout | null = null;
     if (isOpen) {
       document.addEventListener("mousedown", handleClickOutside);
       // Auto-focus input when opened
-      setTimeout(() => inputRef.current?.focus(), 50);
+      focusTimer = setTimeout(() => inputRef.current?.focus(), 50);
     }
     return () => {
       document.removeEventListener("mousedown", handleClickOutside);
+      if (focusTimer) clearTimeout(focusTimer);
     };
   }, [isOpen]);
 
