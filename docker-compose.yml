@@ -45,6 +45,7 @@ services:
       - 8.8.8.8
     volumes:
       - uploads_data:/app/uploads
+      - ./docker/resolv.conf:/etc/resolv.conf:ro
     depends_on:
       postgres:
         condition: service_healthy
@@ -57,10 +58,14 @@ services:
     restart: unless-stopped
     env_file:
       - .env.local
+    environment:
+      TUNNEL_DNS_RESOLVER_ADDRS: "1.1.1.1:53,8.8.8.8:53"
     command: tunnel --no-autoupdate run
     dns:
       - 1.1.1.1
       - 8.8.8.8
+    volumes:
+      - ./docker/resolv.conf:/etc/resolv.conf:ro
     depends_on:
       - web
     networks:
