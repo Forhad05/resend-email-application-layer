@@ -380,6 +380,36 @@ export const auditLogs = pgTable(
   ]
 );
 
+// Inbound & Delivery Webhook Events / Dead-Letter Queue (DLQ)
+export const webhookEvents = pgTable(
+  "webhook_events",
+  {
+    id: uuid("id").primaryKey().defaultRandom(),
+    svixId: text("svix_id"),
+    eventType: text("event_type").notNull(),
+    payload: jsonb("payload").notNull(),
+    status: text("status").notNull().default("pending"), // 'pending' | 'processed' | 'failed' | 'dead_letter'
+    retryCount: integer("retry_count").notNull().default(0),
+    maxRetries: integer("max_retries").notNull().default(3),
+    lastError: text("last_error"),
+    processedAt: timestamp("processed_at", { withTimezone: true }),
+    createdAt: timestamp("created_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+    updatedAt: timestamp("updated_at", { withTimezone: true })
+      .notNull()
+      .defaultNow(),
+  },
+  (table) => [
+    index("idx_webhook_events_status_created").on(table.status, table.createdAt),
+    index("idx_webhook_events_svix_id").on(table.svixId),
+    index("idx_webhook_events_type").on(table.eventType),
+  ]
+);
+
+export type WebhookEvent = typeof webhookEvents.$inferSelect;
+export type NewWebhookEvent = typeof webhookEvents.$inferInsert;
+
 // ==============================================================================
 // DRIZZLE RELATIONS
 // ==============================================================================

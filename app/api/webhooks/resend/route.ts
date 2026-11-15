@@ -1,10 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { resend } from "@/lib/resend";
-import {
-  handleInboundEmail,
-  handleDeliveryEvent,
-  ResendInboundPayload,
-} from "@/lib/email/inbound";
+import { recordWebhookEvent, dispatchWebhookEvent } from "@/lib/webhook/queue";
 
 export async function POST(req: NextRequest) {
   try {
@@ -53,11 +49,9 @@ export async function POST(req: NextRequest) {
 
     // Support both Resend webhook wrappers and direct email worker payloads
     let eventType = typeof event.type === "string" ? event.type : null;
-    let eventData = event.data;
 
     if (!eventType && (event.from || event.to)) {
       eventType = "email.received";
-      eventData = event;
     }
 
     if (!eventType) {
@@ -67,29 +61,25 @@ export async function POST(req: NextRequest) {
       );
     }
 
-    // Process event based on type
-    switch (eventType) {
-      case "email.received":
-        await handleInboundEmail(eventData as ResendInboundPayload);
-        break;
+    // 1. Immediately persist verified webhook in PostgreSQL DLQ queue
+    const recorded = await recordWebhookEvent({
+      svixId: svixId || null,
+      eventType,
+      payload: event,
+    });
 
-      case "email.sent":
-      case "email.delivered":
-      case "email.bounced":
-      case "email.complained":
-      case "email.opened":
-      case "email.clicked":
-        await handleDeliveryEvent(
-          eventType,
-          (eventData || event) as { email_id?: string; to?: string | string[] }
-        );
-        break;
+    // 2. Dispatch event through resilient processor
+    const result = await dispatchWebhookEvent(recorded.id);
 
-      default:
-        console.log(`Unhandled Resend webhook event type: ${eventType}`);
-    }
-
-    return NextResponse.json({ success: true, event: event.type }, { status: 200 });
+    return NextResponse.json(
+      {
+        success: result.success,
+        eventId: recorded.id,
+        eventType,
+        status: result.success ? "processed" : "failed",
+      },
+      { status: 200 }
+    );
   } catch (error: unknown) {
     const err = error as Error;
     console.error("Error processing Resend webhook:", err);

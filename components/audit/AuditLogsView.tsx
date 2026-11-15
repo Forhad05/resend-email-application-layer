@@ -16,7 +16,10 @@ import {
   Code2,
   X,
   ExternalLink,
+  RotateCcw,
 } from "lucide-react";
+import { WebhookEvent } from "@/lib/db/schema";
+import { WebhookDlqView } from "./WebhookDlqView";
 
 export interface AuditLogItem {
   id: string;
@@ -35,9 +38,21 @@ export interface AuditLogItem {
 
 interface AuditLogsViewProps {
   initialLogs: AuditLogItem[];
+  webhookEvents?: WebhookEvent[];
+  webhookStats?: {
+    total: number;
+    processed: number;
+    failed: number;
+    deadLetter: number;
+  };
 }
 
-export function AuditLogsView({ initialLogs }: AuditLogsViewProps) {
+export function AuditLogsView({
+  initialLogs,
+  webhookEvents = [],
+  webhookStats = { total: 0, processed: 0, failed: 0, deadLetter: 0 },
+}: AuditLogsViewProps) {
+  const [activeTab, setActiveTab] = useState<"audit" | "dlq">("audit");
   const [searchTerm, setSearchTerm] = useState("");
   const [selectedActionFilter, setSelectedActionFilter] = useState("all");
   const [selectedEntityFilter, setSelectedEntityFilter] = useState("all");
@@ -245,7 +260,52 @@ export function AuditLogsView({ initialLogs }: AuditLogsViewProps) {
         </div>
       </div>
 
-      {/* Stats Counter Bar */}
+      {/* Navigation Tabs */}
+      <div className="flex items-center gap-2 border-b border-zinc-200 dark:border-zinc-800">
+        <button
+          type="button"
+          onClick={() => setActiveTab("audit")}
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 flex items-center gap-2 transition ${
+            activeTab === "audit"
+              ? "border-black dark:border-white text-zinc-900 dark:text-zinc-100"
+              : "border-transparent text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+          }`}
+        >
+          <ShieldCheck className="h-4 w-4 text-indigo-500" />
+          <span>Activity Audit Trail</span>
+          <span className="px-2 py-0.5 rounded-full text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+            {initialLogs.length}
+          </span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setActiveTab("dlq")}
+          className={`px-4 py-2.5 text-sm font-semibold border-b-2 flex items-center gap-2 transition ${
+            activeTab === "dlq"
+              ? "border-black dark:border-white text-zinc-900 dark:text-zinc-100"
+              : "border-transparent text-zinc-500 hover:text-zinc-900 dark:hover:text-zinc-100"
+          }`}
+        >
+          <RotateCcw className="h-4 w-4 text-amber-500" />
+          <span>Webhook Events & DLQ</span>
+          {webhookStats.failed + webhookStats.deadLetter > 0 ? (
+            <span className="px-2 py-0.5 rounded-full text-xs font-bold bg-red-100 text-red-700 dark:bg-red-950/70 dark:text-red-300">
+              {webhookStats.failed + webhookStats.deadLetter} DLQ
+            </span>
+          ) : (
+            <span className="px-2 py-0.5 rounded-full text-xs bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+              {webhookStats.total}
+            </span>
+          )}
+        </button>
+      </div>
+
+      {activeTab === "dlq" ? (
+        <WebhookDlqView initialEvents={webhookEvents} stats={webhookStats} />
+      ) : (
+        <>
+          {/* Stats Counter Bar */}
       <div className="grid grid-cols-2 sm:grid-cols-5 gap-3">
         <div className="p-4 rounded-xl border border-zinc-200 dark:border-zinc-800 bg-white dark:bg-zinc-900 shadow-2xs">
           <div className="text-xs text-zinc-500 font-medium">Total Events</div>
@@ -494,6 +554,8 @@ export function AuditLogsView({ initialLogs }: AuditLogsViewProps) {
             </div>
           </div>
         </div>
+      )}
+        </>
       )}
     </div>
   );
