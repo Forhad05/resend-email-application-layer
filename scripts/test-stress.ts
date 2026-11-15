@@ -29,10 +29,18 @@ import {
 
 async function cleanupStressRecords(runId: string) {
   try {
-    await db.delete(rateLimits).where(sql`key LIKE ${`%${runId}%`}`);
-    await db.delete(webhookEvents).where(sql`payload::text LIKE ${`%${runId}%`}`);
-    await db.delete(messages).where(sql`from_email LIKE ${`%${runId}%`} OR to_emails::text LIKE ${`%${runId}%`} OR resend_email_id LIKE ${`%${runId}%`}`);
-    await db.delete(threads).where(sql`subject LIKE ${`%${runId}%`}`);
+    await db.delete(rateLimits).where(
+      sql`key LIKE ${`%${runId}%`} OR key LIKE '%benchmark.local%' OR key LIKE 'tx:ip:%'`
+    );
+    await db.delete(webhookEvents).where(
+      sql`payload::text LIKE ${`%${runId}%`} OR payload::text LIKE '%benchmark.local%'`
+    );
+    await db.delete(messages).where(
+      sql`from_email LIKE ${`%${runId}%`} OR to_emails::text LIKE ${`%${runId}%`} OR resend_email_id LIKE ${`%${runId}%`} OR from_email LIKE '%benchmark.local%' OR to_emails::text LIKE '%benchmark.local%'`
+    );
+    await db.delete(threads).where(
+      sql`subject LIKE ${`%${runId}%`} OR subject LIKE '%benchmark%'`
+    );
   } catch (cleanErr) {
     console.warn("Cleanup warning:", cleanErr);
   }
@@ -65,23 +73,27 @@ async function runStressBenchmarks() {
     const { result: burstResults, durationMs: totalBurstDuration } = await measure(async () => {
       const promises = Array.from({ length: burstCount }, async (_, idx) => {
         const start = performance.now();
-        const res = await fetch(`${appUrl}/api/webhooks/resend`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            type: "email.sent",
-            data: {
-              email_id: `re_stress_burst_${idx}_${runId}`,
-              to: [`user_${idx}_${runId}@benchmark.local`],
-            },
-          }),
-          signal: AbortSignal.timeout(10000),
-        });
+        try {
+          const res = await fetch(`${appUrl}/api/webhooks/resend`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              type: "email.sent",
+              data: {
+                email_id: `re_stress_burst_${idx}_${runId}`,
+                to: [`user_${idx}_${runId}@benchmark.local`],
+              },
+            }),
+            signal: AbortSignal.timeout(10000),
+          });
 
-        const reqDuration = Math.round((performance.now() - start) * 10) / 10;
-        burstDurations.push(reqDuration);
-        const data = await res.json().catch(() => ({}));
-        return { status: res.status, eventId: data?.eventId };
+          const reqDuration = Math.round((performance.now() - start) * 10) / 10;
+          burstDurations.push(reqDuration);
+          const data = await res.json().catch(() => ({}));
+          return { status: res.status, eventId: data?.eventId };
+        } catch {
+          return { status: 0, eventId: null };
+        }
       });
 
       return Promise.all(promises);
@@ -148,17 +160,21 @@ async function runStressBenchmarks() {
 
     const { result: idemResults, durationMs: idemDuration } = await measure(async () => {
       const promises = Array.from({ length: idemCount }, async () => {
-        const res = await fetch(`${appUrl}/api/send/transactional`, {
-          method: "POST",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify({
-            to: `idem.user.${runId}@benchmark.local`,
-            templateSlug: "support-ticket",
-            idempotencyKey,
-          }),
-          signal: AbortSignal.timeout(5000),
-        });
-        return res.status;
+        try {
+          const res = await fetch(`${appUrl}/api/send/transactional`, {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              to: `idem.user.${runId}@benchmark.local`,
+              templateSlug: "support-ticket",
+              idempotencyKey,
+            }),
+            signal: AbortSignal.timeout(5000),
+          });
+          return res.status;
+        } catch {
+          return 0;
+        }
       });
       return Promise.all(promises);
     });
@@ -184,12 +200,16 @@ async function runStressBenchmarks() {
 
     const { durationMs: totalPoolDuration } = await measure(async () => {
       const promises = Array.from({ length: poolQueryCount }, async () => {
-        const start = performance.now();
-        await db.execute(sql`
-          SELECT pg_sleep(0.01), count(*) 
-          FROM information_schema.tables;
-        `);
-        poolDurations.push(Math.round((performance.now() - start) * 10) / 10);
+        try {
+          const start = performance.now();
+          await db.execute(sql`
+            SELECT pg_sleep(0.01), count(*) 
+            FROM information_schema.tables;
+          `);
+          poolDurations.push(Math.round((performance.now() - start) * 10) / 10);
+        } catch (err) {
+          console.warn("Pool query warning:", err);
+        }
       });
       return Promise.all(promises);
     });
