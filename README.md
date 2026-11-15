@@ -937,6 +937,11 @@ Open [http://localhost:3000](http://localhost:3000) in your browser. Default tem
 | `npm run build` | Compiles an optimized production build with Next.js 16 Partial Prerendering. |
 | `npm run start` | Boots the compiled production application on the host. |
 | `npm run lint` | Runs ESLint across all codebase files. |
+| `npm run test:smoke` | Runs fast post-deploy sanity check (<250ms). |
+| `npm run test:webhooks` | Simulates inbound threading, delivery events, and bounce suppression. |
+| `npm run test:stress` | Runs 50 parallel webhook bursts, 429 rate-limiting, and pool benchmarks. |
+| `npm run test:fuzz` | Tests Brotli shield, path traversal, XSS, and SQL injection resistance. |
+| `npm run test:all` | Executes all 56 automated tests back-to-back with zero residual leaks. |
 
 ---
 
