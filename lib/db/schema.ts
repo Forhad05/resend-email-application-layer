@@ -174,6 +174,12 @@ export const threads = pgTable(
     // Labels / Tags
     labels: text("labels").array().default([]),
 
+    // SLA & Escalation
+    slaDueAt: timestamp("sla_due_at", { withTimezone: true }),
+    slaBreached: boolean("sla_breached").notNull().default(false),
+    firstResponseAt: timestamp("first_response_at", { withTimezone: true }),
+    resolvedAt: timestamp("resolved_at", { withTimezone: true }),
+
     createdAt: timestamp("created_at", { withTimezone: true })
       .notNull()
       .defaultNow(),
@@ -186,6 +192,8 @@ export const threads = pgTable(
     index("idx_threads_assigned_to").on(table.assignedTo),
     index("idx_threads_last_message_at").on(table.lastMessageAt),
     index("idx_threads_contact_email").on(table.contactEmail),
+    index("idx_threads_sla_due").on(table.slaDueAt),
+    index("idx_threads_sla_breached").on(table.slaBreached),
   ]
 );
 

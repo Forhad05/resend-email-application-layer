@@ -220,13 +220,15 @@ export async function replyToThread({
       }
     }
 
-    // 8. Update thread counters
+    // 8. Update thread counters and record first response SLA
+    const replyNow = new Date();
     await db
       .update(threads)
       .set({
         messageCount: (thread.messageCount || 0) + 1,
-        lastMessageAt: new Date(),
-        updatedAt: new Date(),
+        lastMessageAt: replyNow,
+        firstResponseAt: thread.firstResponseAt ?? replyNow,
+        updatedAt: replyNow,
       })
       .where(eq(threads.id, thread.id));
 

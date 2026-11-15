@@ -1,6 +1,6 @@
 "use client";
 
-import { useState, useMemo, useRef, useEffect } from "react";
+import { useState, useMemo, useRef, useEffect, useSyncExternalStore } from "react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import {
@@ -12,11 +12,26 @@ import {
   X,
   Tag,
   CornerDownLeft,
+  Clock,
 } from "lucide-react";
 import { InboxLiveRefresher } from "./InboxLiveRefresher";
 import { getLabelColorClass } from "@/lib/email/labels";
 import { isInputFocused } from "@/components/shortcuts/KeyboardShortcutsProvider";
 import { updateThreadStatusAction } from "@/app/(dashboard)/inbox/[threadId]/actions";
+import { calculateSlaStatus } from "@/lib/email/sla-utils";
+
+function subscribeClock(callback: () => void) {
+  const timer = setInterval(callback, 60000);
+  return () => clearInterval(timer);
+}
+
+function getClockSnapshot() {
+  return Date.now();
+}
+
+function getServerClockSnapshot() {
+  return 0;
+}
 
 export interface ThreadItem {
   id: string;
@@ -30,6 +45,8 @@ export interface ThreadItem {
   lastMessageAt: Date | string | null;
   isRead: boolean;
   labels?: string[] | null;
+  slaDueAt?: Date | string | null;
+  slaBreached?: boolean;
 }
 
 interface TeamMember {
@@ -53,6 +70,11 @@ export function InboxThreadView({
   const [searchQuery, setSearchQuery] = useState<string>("");
   const [selectedIndex, setSelectedIndex] = useState<number>(-1);
   const searchInputRef = useRef<HTMLInputElement>(null);
+  const currentNow = useSyncExternalStore(
+    subscribeClock,
+    getClockSnapshot,
+    getServerClockSnapshot
+  );
 
   // Collect all unique labels and their frequency counts
   const labelCounts = useMemo(() => {
@@ -79,14 +101,28 @@ export function InboxThreadView({
       pending: initialThreads.filter((t) => t.status === "pending").length,
       resolved: initialThreads.filter((t) => t.status === "resolved").length,
       closed: initialThreads.filter((t) => t.status === "closed").length,
+      breached: initialThreads.filter(
+        (t) =>
+          (t.status === "open" || t.status === "pending") &&
+          (t.slaBreached ||
+            (currentNow > 0 && t.slaDueAt ? new Date(t.slaDueAt).getTime() <= currentNow : false))
+      ).length,
     };
-  }, [initialThreads]);
+  }, [initialThreads, currentNow]);
 
   // Filtered thread list
   const filteredThreads = useMemo(() => {
     return initialThreads.filter((thread) => {
       // Status filter
-      if (selectedStatus !== "all" && thread.status !== selectedStatus) {
+      if (selectedStatus === "breached") {
+        const isBreached =
+          (thread.status === "open" || thread.status === "pending") &&
+          (thread.slaBreached ||
+            (currentNow > 0 && thread.slaDueAt
+              ? new Date(thread.slaDueAt).getTime() <= currentNow
+              : false));
+        if (!isBreached) return false;
+      } else if (selectedStatus !== "all" && thread.status !== selectedStatus) {
         return false;
       }
 
@@ -124,7 +160,14 @@ export function InboxThreadView({
 
       return true;
     });
-  }, [initialThreads, selectedStatus, selectedAssignee, selectedLabel, searchQuery]);
+  }, [
+    initialThreads,
+    selectedStatus,
+    selectedAssignee,
+    selectedLabel,
+    searchQuery,
+    currentNow,
+  ]);
 
   const unreadCount = initialThreads.filter((t) => !t.isRead).length;
   const latestTimestamp = initialThreads[0]?.lastMessageAt
@@ -247,6 +290,12 @@ export function InboxThreadView({
               { id: "all", label: "All", count: counts.all },
               { id: "open", label: "Open", count: counts.open },
               { id: "pending", label: "Pending", count: counts.pending },
+              {
+                id: "breached",
+                label: "Breached SLA",
+                count: counts.breached,
+                isAlert: counts.breached > 0,
+              },
               { id: "resolved", label: "Resolved", count: counts.resolved },
               { id: "closed", label: "Closed", count: counts.closed },
             ].map((tab) => {
@@ -258,7 +307,11 @@ export function InboxThreadView({
                   onClick={() => setSelectedStatus(tab.id)}
                   className={`px-3 py-1.5 rounded-lg text-xs font-semibold whitespace-nowrap transition-all flex items-center gap-1.5 ${
                     isActive
-                      ? "bg-black text-white dark:bg-white dark:text-black shadow-xs"
+                      ? tab.id === "breached"
+                        ? "bg-red-600 text-white shadow-xs"
+                        : "bg-black text-white dark:bg-white dark:text-black shadow-xs"
+                      : tab.isAlert
+                      ? "text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-950/30"
                       : "text-zinc-600 dark:text-zinc-400 hover:text-zinc-900 dark:hover:text-zinc-100 hover:bg-zinc-100 dark:hover:bg-zinc-800"
                   }`}
                 >
@@ -266,7 +319,9 @@ export function InboxThreadView({
                   <span
                     className={`px-1.5 py-0.2 rounded-full text-[10px] ${
                       isActive
-                        ? "bg-zinc-800 text-zinc-200 dark:bg-zinc-200 dark:text-black font-bold"
+                        ? "bg-black/20 dark:bg-white/20 text-white dark:text-black font-bold"
+                        : tab.isAlert
+                        ? "bg-red-100 text-red-700 dark:bg-red-950/60 dark:text-red-300 font-bold"
                         : "bg-zinc-200/80 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400"
                     }`}
                   >
@@ -405,6 +460,13 @@ export function InboxThreadView({
               const formattedDate = thread.lastMessageAt
                 ? new Date(thread.lastMessageAt).toLocaleDateString()
                 : "Just now";
+              const sla = calculateSlaStatus({
+                status: thread.status,
+                priority: thread.priority,
+                slaDueAt: thread.slaDueAt,
+                slaBreached: thread.slaBreached,
+                referenceTime: currentNow > 0 ? currentNow : undefined,
+              });
 
               return (
                 <Link
@@ -452,6 +514,24 @@ export function InboxThreadView({
 
                       {/* Priority Badge */}
                       {renderPriorityBadge(thread.priority)}
+
+                      {/* Dynamic SLA Countdown / Breach Badge */}
+                      {sla && (
+                        <span
+                          className={`px-2 py-0.5 rounded-full text-[10px] font-medium flex items-center gap-1 shrink-0 ${
+                            sla.state === "breached"
+                              ? "bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300 border border-red-200 dark:border-red-800 animate-pulse font-bold"
+                              : sla.state === "warning"
+                              ? "bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-800 font-semibold"
+                              : sla.state === "met"
+                              ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                              : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-400"
+                          }`}
+                        >
+                          <Clock className="h-3 w-3" />
+                          <span>{sla.label}</span>
+                        </span>
+                      )}
                     </div>
 
                     <div className="flex items-center gap-3 shrink-0 text-xs text-zinc-500">

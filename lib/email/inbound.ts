@@ -10,6 +10,7 @@ import { eq, or, sql, desc } from "drizzle-orm";
 import { revalidatePath } from "next/cache";
 import PostalMime from "postal-mime";
 import { logAuditEvent } from "@/lib/audit";
+import { evaluateAutoTriage, computeSlaDueAt } from "@/lib/email/sla";
 
 export interface ResendInboundPayload {
   email_id?: string;
@@ -228,14 +229,24 @@ export async function handleInboundEmail(data: ResendInboundPayload) {
     }
   }
 
+  // Auto-Triage & SLA Target Evaluation
+  const triage = evaluateAutoTriage(subject, data.text || data.html || "");
+  const triagePriority = triage.priority || "normal";
+  const triageLabels = triage.labels;
+
   // Strategy D: Create new Thread if no existing conversation matched
   if (!targetThreadId) {
+    const slaDueAt = computeSlaDueAt(triagePriority);
+
     const [newThread] = await db
       .insert(threads)
       .values({
         subject: subject,
         status: "open",
-        priority: "normal",
+        priority: triagePriority,
+        labels: triageLabels,
+        slaDueAt: slaDueAt,
+        slaBreached: false,
         contactEmail: fromEmail,
         contactId: contactId,
         messageCount: 1,
@@ -245,18 +256,74 @@ export async function handleInboundEmail(data: ResendInboundPayload) {
       .returning({ id: threads.id });
 
     targetThreadId = newThread.id;
+
+    if (triage.priority || triage.labels.length > 0) {
+      await logAuditEvent({
+        actor: { id: "system", name: "Auto-Triage Engine", email: "system@internal" },
+        action: "thread.triaged",
+        entityType: "thread",
+        entityId: targetThreadId,
+        details: {
+          elevatedPriority: triage.priority || null,
+          autoAppliedLabels: triage.labels,
+          matchedRules: triage.matchedRules,
+          subject,
+        },
+      });
+    }
   } else {
-    // Update existing thread: increment messageCount, reopen, update lastMessageAt
+    // Fetch existing thread to merge labels and respect higher priority
+    const [existingThread] = await db
+      .select({
+        priority: threads.priority,
+        labels: threads.labels,
+      })
+      .from(threads)
+      .where(eq(threads.id, targetThreadId))
+      .limit(1);
+
+    let updatedPriority = existingThread?.priority || "normal";
+    if (
+      triagePriority === "urgent" ||
+      (triagePriority === "high" && (updatedPriority === "normal" || updatedPriority === "low"))
+    ) {
+      updatedPriority = triagePriority;
+    }
+
+    const currentLabels = existingThread?.labels || [];
+    const mergedLabels = Array.from(new Set([...currentLabels, ...triageLabels]));
+    const slaDueAt = computeSlaDueAt(updatedPriority);
+
+    // Update existing thread: increment messageCount, reopen, update lastMessageAt & SLA
     await db
       .update(threads)
       .set({
         status: "open",
+        priority: updatedPriority,
+        labels: mergedLabels,
+        slaDueAt: slaDueAt,
+        slaBreached: false,
         messageCount: sql`${threads.messageCount} + 1`,
         lastMessageAt: new Date(),
         isRead: false,
         updatedAt: new Date(),
       })
       .where(eq(threads.id, targetThreadId));
+
+    if (triage.priority || triage.labels.length > 0) {
+      await logAuditEvent({
+        actor: { id: "system", name: "Auto-Triage Engine", email: "system@internal" },
+        action: "thread.triaged",
+        entityType: "thread",
+        entityId: targetThreadId,
+        details: {
+          elevatedPriority: triage.priority || null,
+          autoAppliedLabels: triage.labels,
+          matchedRules: triage.matchedRules,
+          subject,
+        },
+      });
+    }
   }
 
   // 3. Insert the inbound message

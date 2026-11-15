@@ -20,6 +20,7 @@ import { ThreadKeyboardShortcuts } from "@/components/inbox/ThreadKeyboardShortc
 import { DeliveryStatusBadge } from "@/components/inbox/DeliveryStatusBadge";
 import { AuditTimelineItem } from "@/components/audit/AuditTimelineItem";
 import { getThreadAuditLogs } from "@/lib/audit";
+import { calculateSlaStatus } from "@/lib/email/sla-utils";
 import {
   ArrowLeft,
   Clock,
@@ -165,6 +166,15 @@ async function ThreadDetails({
     })),
   ].sort((a, b) => a.createdAt.getTime() - b.createdAt.getTime());
 
+  const sla = calculateSlaStatus({
+    status: thread.status,
+    priority: thread.priority,
+    slaDueAt: thread.slaDueAt,
+    slaBreached: thread.slaBreached,
+    firstResponseAt: thread.firstResponseAt,
+    resolvedAt: thread.resolvedAt,
+  });
+
   return (
     <div className="space-y-6">
       {/* Thread Hotkey Controller (r, e, u) */}
@@ -188,6 +198,25 @@ async function ThreadDetails({
                   <span className="text-xs text-amber-600 dark:text-amber-400 font-medium flex items-center gap-1">
                     <Lock className="h-3 w-3" />
                     {noteList.length} {noteList.length === 1 ? "note" : "notes"}
+                  </span>
+                </>
+              )}
+              {sla && (
+                <>
+                  <span className="text-zinc-300 dark:text-zinc-700">•</span>
+                  <span
+                    className={`px-2.5 py-0.5 rounded-full text-xs font-semibold flex items-center gap-1.5 ${
+                      sla.state === "breached"
+                        ? "bg-red-100 text-red-700 dark:bg-red-950/80 dark:text-red-300 border border-red-200 dark:border-red-800 animate-pulse font-bold"
+                        : sla.state === "warning"
+                        ? "bg-amber-100 text-amber-800 dark:bg-amber-950/80 dark:text-amber-300 border border-amber-200 dark:border-amber-800"
+                        : sla.state === "met"
+                        ? "bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800"
+                        : "bg-zinc-100 text-zinc-600 dark:bg-zinc-800/80 dark:text-zinc-400"
+                    }`}
+                  >
+                    <Clock className="h-3 w-3" />
+                    <span>SLA: {sla.label}</span>
                   </span>
                 </>
               )}

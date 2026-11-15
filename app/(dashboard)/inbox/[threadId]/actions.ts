@@ -14,6 +14,7 @@ import {
 } from "@/lib/email/attachments";
 import { logAuditEvent } from "@/lib/audit";
 import { cleanLabel } from "@/lib/email/labels";
+import { computeSlaDueAt } from "@/lib/email/sla";
 
 export async function replyAction(
   threadIdOrFormData: string | FormData,
@@ -149,10 +150,13 @@ export async function updateThreadStatusAction(
       .where(eq(threads.id, threadId))
       .limit(1);
 
+    const isResolving = status === "resolved" || status === "closed";
+
     await db
       .update(threads)
       .set({
         status,
+        resolvedAt: isResolving ? new Date() : null,
         updatedAt: new Date(),
       })
       .where(eq(threads.id, threadId));
@@ -164,6 +168,7 @@ export async function updateThreadStatusAction(
       details: {
         previousStatus: current?.status || "unknown",
         newStatus: status,
+        resolvedAt: isResolving ? new Date().toISOString() : null,
       },
     });
 
@@ -182,16 +187,26 @@ export async function updateThreadPriorityAction(
 ) {
   try {
     const [current] = await db
-      .select({ priority: threads.priority })
+      .select({
+        priority: threads.priority,
+        createdAt: threads.createdAt,
+        slaBreached: threads.slaBreached,
+      })
       .from(threads)
       .where(eq(threads.id, threadId))
       .limit(1);
+
+    const now = new Date();
+    const newSlaDue = computeSlaDueAt(priority, current?.createdAt ?? now);
+    const isBreached = current?.slaBreached ? newSlaDue <= now : false;
 
     await db
       .update(threads)
       .set({
         priority,
-        updatedAt: new Date(),
+        slaDueAt: newSlaDue,
+        slaBreached: isBreached,
+        updatedAt: now,
       })
       .where(eq(threads.id, threadId));
 
@@ -202,6 +217,7 @@ export async function updateThreadPriorityAction(
       details: {
         previousPriority: current?.priority || "normal",
         newPriority: priority,
+        newSlaDueAt: newSlaDue.toISOString(),
       },
     });
 

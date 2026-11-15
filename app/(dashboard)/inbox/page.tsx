@@ -7,9 +7,15 @@ import Link from "next/link";
 import { InboxThreadView } from "@/components/inbox/InboxThreadView";
 import { getTeamMembers } from "@/lib/db/team";
 import { connection } from "next/server";
+import { evaluateAndEscalateBreachedSlas } from "@/lib/email/sla";
 
 async function ThreadList() {
   await connection();
+  // Automatically evaluate and escalate any active tickets that breached SLA
+  await evaluateAndEscalateBreachedSlas().catch((err) =>
+    console.warn("SLA evaluation warning:", err)
+  );
+
   const [threadList, teamMembers] = await Promise.all([
     db
       .select({
@@ -24,6 +30,8 @@ async function ThreadList() {
         lastMessageAt: threads.lastMessageAt,
         isRead: threads.isRead,
         labels: threads.labels,
+        slaDueAt: threads.slaDueAt,
+        slaBreached: threads.slaBreached,
       })
       .from(threads)
       .leftJoin(user, eq(threads.assignedTo, user.id))
