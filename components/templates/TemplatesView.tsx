@@ -11,14 +11,18 @@ import {
   Loader2,
   Eye,
   Code,
+  Sparkles,
+  Laptop,
+  Code2,
 } from "lucide-react";
 import {
   createTemplateAction,
   updateTemplateAction,
   deleteTemplateAction,
   sendTestTemplateEmailAction,
+  previewReactEmailAction,
 } from "@/app/(dashboard)/templates/actions";
-import { interpolateTemplate } from "@/lib/email/template-utils";
+import { interpolateTemplate, isReactEmailSlug } from "@/lib/email/template-utils";
 
 export interface TemplateRecord {
   id: string;
@@ -63,6 +67,14 @@ export function TemplatesView({ initialTemplates }: TemplatesViewProps) {
   const [testStatus, setTestStatus] = useState<string | null>(null);
   const [isTestPending, startTestTransition] = useTransition();
 
+  // Preview & React Email states
+  const [previewTab, setPreviewTab] = useState<"visual" | "html" | "text">("visual");
+  const [renderedReactEmail, setRenderedReactEmail] = useState<{
+    html: string;
+    text: string;
+  } | null>(null);
+  const [isRendering, setIsRendering] = useState(false);
+
   const openEdit = (tpl: TemplateRecord) => {
     setSelectedTemplate(tpl);
     setEditName(tpl.name);
@@ -72,9 +84,27 @@ export function TemplatesView({ initialTemplates }: TemplatesViewProps) {
     setEditError(null);
   };
 
-  const openPreview = (tpl: TemplateRecord) => {
+  const openPreview = async (tpl: TemplateRecord) => {
     setPreviewTemplate(tpl);
     setTestStatus(null);
+    setRenderedReactEmail(null);
+
+    if (isReactEmailSlug(tpl.slug)) {
+      setPreviewTab("visual");
+      setIsRendering(true);
+      try {
+        const res = await previewReactEmailAction(tpl.slug);
+        if (res.isSupported && res.html) {
+          setRenderedReactEmail({ html: res.html, text: res.text || "" });
+        }
+      } catch (err) {
+        console.error("Failed to render React Email preview:", err);
+      } finally {
+        setIsRendering(false);
+      }
+    } else {
+      setPreviewTab("text");
+    }
   };
 
   const handleCreate = (e: React.FormEvent) => {
@@ -135,13 +165,19 @@ export function TemplatesView({ initialTemplates }: TemplatesViewProps) {
     });
   };
 
+  const [useReactEmailInTest, setUseReactEmailInTest] = useState(true);
+
   const handleTestSend = (e: React.FormEvent) => {
     e.preventDefault();
     if (!previewTemplate || !testEmail.trim()) return;
     setTestStatus(null);
 
     startTestTransition(async () => {
-      const res = await sendTestTemplateEmailAction(previewTemplate.slug, testEmail);
+      const res = await sendTestTemplateEmailAction(
+        previewTemplate.slug,
+        testEmail.trim(),
+        useReactEmailInTest
+      );
       if (res.success) {
         setTestStatus("✅ Test email delivered successfully!");
       } else {
@@ -195,9 +231,17 @@ export function TemplatesView({ initialTemplates }: TemplatesViewProps) {
                   <FileText className="h-4 w-4 text-zinc-400" />
                   <span>{tpl.name}</span>
                 </h3>
-                <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
-                  {tpl.slug}
-                </span>
+                <div className="flex items-center gap-1.5">
+                  {isReactEmailSlug(tpl.slug) && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900 inline-flex items-center gap-1">
+                      <Sparkles className="h-2.5 w-2.5 text-indigo-500" />
+                      React Email
+                    </span>
+                  )}
+                  <span className="font-mono text-[10px] px-2 py-0.5 rounded bg-zinc-100 dark:bg-zinc-800 text-zinc-600 dark:text-zinc-400">
+                    {tpl.slug}
+                  </span>
+                </div>
               </div>
 
               <p className="text-xs text-zinc-500 leading-relaxed">
@@ -249,13 +293,21 @@ export function TemplatesView({ initialTemplates }: TemplatesViewProps) {
 
       {/* Preview & Test Send Modal */}
       {previewTemplate && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/40 backdrop-blur-xs p-4">
-          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-xl p-6 max-w-lg w-full shadow-xl space-y-4 max-h-[90vh] overflow-y-auto">
-            <div className="flex items-center justify-between">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-xs p-4">
+          <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-800 rounded-2xl p-6 max-w-2xl w-full shadow-2xl space-y-4 max-h-[92vh] overflow-y-auto">
+            <div className="flex items-center justify-between border-b border-zinc-200 dark:border-zinc-800 pb-3">
               <div>
-                <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
-                  Template Preview: {previewTemplate.name}
-                </h3>
+                <div className="flex items-center gap-2">
+                  <h3 className="text-base font-bold text-zinc-900 dark:text-zinc-100">
+                    {previewTemplate.name}
+                  </h3>
+                  {isReactEmailSlug(previewTemplate.slug) && (
+                    <span className="text-[10px] font-semibold px-2 py-0.5 rounded-full bg-indigo-50 text-indigo-700 dark:bg-indigo-950/60 dark:text-indigo-300 border border-indigo-200 dark:border-indigo-900 inline-flex items-center gap-1">
+                      <Sparkles className="h-2.5 w-2.5 text-indigo-500" />
+                      React Email
+                    </span>
+                  )}
+                </div>
                 <span className="text-xs text-zinc-500 font-mono">
                   Slug: {previewTemplate.slug}
                 </span>
@@ -263,30 +315,128 @@ export function TemplatesView({ initialTemplates }: TemplatesViewProps) {
               <button
                 type="button"
                 onClick={() => setPreviewTemplate(null)}
-                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200"
+                className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 p-1 rounded-md hover:bg-zinc-100 dark:hover:bg-zinc-800"
               >
                 <X className="h-4 w-4" />
               </button>
             </div>
 
             {/* Interpolated Subject Preview */}
-            <div className="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-xs">
-              <span className="font-bold text-zinc-500">Subject: </span>
-              <span className="font-semibold text-zinc-900 dark:text-zinc-100">
+            <div className="p-3 rounded-lg bg-zinc-50 dark:bg-zinc-800/80 border border-zinc-200 dark:border-zinc-700 text-xs flex items-center gap-2">
+              <span className="font-bold text-zinc-500 shrink-0">Subject:</span>
+              <span className="font-semibold text-zinc-900 dark:text-zinc-100 truncate">
                 {interpolateTemplate(previewTemplate.subject, sampleVariables)}
               </span>
             </div>
 
-            {/* Body Preview */}
-            <div className="p-4 rounded-lg bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap font-sans leading-relaxed">
-              {interpolateTemplate(previewTemplate.textBody || "", sampleVariables)}
+            {/* View Mode Tabs */}
+            <div className="flex items-center justify-between">
+              <div className="flex items-center gap-1 bg-zinc-100 dark:bg-zinc-800 p-1 rounded-lg text-xs">
+                {isReactEmailSlug(previewTemplate.slug) && (
+                  <button
+                    type="button"
+                    onClick={() => setPreviewTab("visual")}
+                    className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md font-medium transition-all ${
+                      previewTab === "visual"
+                        ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-xs font-semibold"
+                        : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                    }`}
+                  >
+                    <Laptop className="h-3.5 w-3.5 text-indigo-500" />
+                    <span>Visual (React Email)</span>
+                  </button>
+                )}
+                <button
+                  type="button"
+                  onClick={() => setPreviewTab("text")}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md font-medium transition-all ${
+                    previewTab === "text"
+                      ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-xs font-semibold"
+                      : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                  }`}
+                >
+                  <FileText className="h-3.5 w-3.5" />
+                  <span>Plain Text</span>
+                </button>
+                <button
+                  type="button"
+                  onClick={() => setPreviewTab("html")}
+                  className={`inline-flex items-center gap-1.5 px-3 py-1 rounded-md font-medium transition-all ${
+                    previewTab === "html"
+                      ? "bg-white dark:bg-zinc-900 text-zinc-900 dark:text-zinc-100 shadow-xs font-semibold"
+                      : "text-zinc-500 hover:text-zinc-800 dark:hover:text-zinc-200"
+                  }`}
+                >
+                  <Code2 className="h-3.5 w-3.5" />
+                  <span>HTML Source</span>
+                </button>
+              </div>
+
+              {isReactEmailSlug(previewTemplate.slug) && (
+                <span className="text-[11px] text-zinc-400">
+                  Rendered via @react-email/render
+                </span>
+              )}
             </div>
 
+            {/* Tab Body */}
+            {previewTab === "visual" && (
+              <div className="border border-zinc-200 dark:border-zinc-700 rounded-xl overflow-hidden bg-white">
+                {isRendering ? (
+                  <div className="h-80 flex flex-col items-center justify-center gap-2 text-zinc-400 text-xs">
+                    <Loader2 className="h-5 w-5 animate-spin" />
+                    <span>Compiling React Email template...</span>
+                  </div>
+                ) : renderedReactEmail?.html ? (
+                  <iframe
+                    srcDoc={renderedReactEmail.html}
+                    title="React Email Preview"
+                    className="w-full h-80 border-0"
+                    sandbox="allow-same-origin"
+                  />
+                ) : (
+                  <div className="h-80 flex items-center justify-center text-xs text-zinc-400">
+                    No React Email rendered preview available.
+                  </div>
+                )}
+              </div>
+            )}
+
+            {previewTab === "text" && (
+              <div className="p-4 rounded-xl bg-zinc-50 dark:bg-zinc-800/60 border border-zinc-200 dark:border-zinc-700 text-xs text-zinc-800 dark:text-zinc-200 whitespace-pre-wrap font-sans leading-relaxed max-h-80 overflow-y-auto">
+                {renderedReactEmail?.text ||
+                  interpolateTemplate(previewTemplate.textBody || "", sampleVariables)}
+              </div>
+            )}
+
+            {previewTab === "html" && (
+              <pre className="p-4 rounded-xl bg-zinc-950 text-zinc-200 border border-zinc-800 text-[11px] font-mono leading-relaxed max-h-80 overflow-y-auto overflow-x-auto whitespace-pre-wrap">
+                <code>
+                  {renderedReactEmail?.html ||
+                    previewTemplate.htmlBody ||
+                    "No HTML content available."}
+                </code>
+              </pre>
+            )}
+
             {/* Test Send Form */}
-            <form onSubmit={handleTestSend} className="space-y-2 pt-2 border-t border-zinc-200 dark:border-zinc-800">
-              <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
-                Send a Live Test to:
-              </label>
+            <form onSubmit={handleTestSend} className="space-y-3 pt-3 border-t border-zinc-200 dark:border-zinc-800">
+              <div className="flex items-center justify-between">
+                <label className="block text-xs font-semibold text-zinc-700 dark:text-zinc-300">
+                  Send a Live Test to:
+                </label>
+                {isReactEmailSlug(previewTemplate.slug) && (
+                  <label className="inline-flex items-center gap-1.5 text-xs text-zinc-600 dark:text-zinc-400 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={useReactEmailInTest}
+                      onChange={(e) => setUseReactEmailInTest(e.target.checked)}
+                      className="rounded border-zinc-300 text-black focus:ring-black dark:border-zinc-700"
+                    />
+                    <span>Use React Email (JSX)</span>
+                  </label>
+                )}
+              </div>
               <div className="flex items-center gap-2">
                 <input
                   type="email"

@@ -4,7 +4,7 @@ import { sendTransactionalEmail } from "@/lib/email/transactional";
 export async function POST(request: Request) {
   try {
     const body = await request.json();
-    const { to, templateSlug, variables, fromEmail, idempotencyKey } = body;
+    const { to, templateSlug, variables, fromEmail, idempotencyKey, useReactEmail } = body;
 
     if (!to || !templateSlug) {
       return NextResponse.json(
@@ -22,6 +22,7 @@ export async function POST(request: Request) {
       variables,
       fromEmail,
       idempotencyKey,
+      useReactEmail,
     });
 
     if (!result.success) {
