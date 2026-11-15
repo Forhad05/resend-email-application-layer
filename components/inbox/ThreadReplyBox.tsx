@@ -70,6 +70,18 @@ export function ThreadReplyBox({
     };
   }, []);
 
+  // Keyboard accessibility: Escape to dismiss AI assistant drawer
+  useEffect(() => {
+    if (!showAiDrawer) return;
+    function handleKeyDown(e: KeyboardEvent) {
+      if (e.key === "Escape") {
+        setShowAiDrawer(false);
+      }
+    }
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [showAiDrawer]);
+
   const handleReply = (e: React.FormEvent) => {
     e.preventDefault();
     if (!body.trim() || isSuppressed) return;
@@ -133,6 +145,11 @@ export function ThreadReplyBox({
 
   const handleInsertAiDraft = () => {
     if (!aiDraft) return;
+    if (body.trim() && body.trim() !== aiDraft.trim()) {
+      if (!confirm("Replace your current draft in the editor with this AI suggestion?")) {
+        return;
+      }
+    }
     setBody(aiDraft);
     setAiInserted(true);
     if (insertTimerRef.current) clearTimeout(insertTimerRef.current);
@@ -341,9 +358,18 @@ export function ThreadReplyBox({
             )}
 
             {aiError && (
-              <div className="p-2.5 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 text-xs flex items-center gap-2">
-                <AlertCircle className="h-4 w-4 shrink-0" />
-                <span>{aiError}</span>
+              <div className="p-2.5 rounded-lg bg-red-50 dark:bg-red-950/40 border border-red-200 dark:border-red-900 text-red-700 dark:text-red-300 text-xs flex items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <AlertCircle className="h-4 w-4 shrink-0" />
+                  <span>{aiError}</span>
+                </div>
+                <button
+                  type="button"
+                  onClick={() => setAiError(null)}
+                  className="p-0.5 text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 rounded"
+                >
+                  <X className="h-3.5 w-3.5" />
+                </button>
               </div>
             )}
 

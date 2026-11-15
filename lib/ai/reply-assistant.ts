@@ -28,13 +28,20 @@ export interface GeneratedDraftResult {
  */
 function extractCustomerName(fromName: string | null, email: string): string {
   if (fromName && fromName.trim() && !fromName.includes("@")) {
-    const parts = fromName.trim().split(" ");
-    return parts[0];
+    const rawParts = fromName.trim().split(/\s+/);
+    // Ignore common honorifics (Mr., Mrs., Dr., etc.)
+    const filtered = rawParts.filter(
+      (p) => !/^(mr|mrs|ms|dr|prof)\.?$/i.test(p)
+    );
+    if (filtered.length > 0) {
+      return filtered[0];
+    }
+    return rawParts[0];
   }
   const localPart = email.split("@")[0] || "there";
-  // Clean dots and underscores (e.g. john.doe -> John)
+  // Clean dots, hyphens, and underscores (e.g. john.doe -> John)
   const clean = localPart.replace(/[._-]/g, " ").trim();
-  const first = clean.split(" ")[0];
+  const first = clean.split(/\s+/)[0];
   return first ? first.charAt(0).toUpperCase() + first.slice(1) : "there";
 }
 
@@ -113,7 +120,9 @@ export async function generateAiReplyDraftAction(
     };
   }
 
-  const { threadId, tone = "formal" } = options;
+  const { threadId } = options;
+  const validTones: ReplyTone[] = ["formal", "quick_ack", "clarification"];
+  const tone: ReplyTone = validTones.includes(options.tone) ? options.tone : "formal";
 
   try {
     // 1. Fetch thread details
@@ -218,6 +227,7 @@ Respond ONLY with the body of the email. Do not include subject lines, markdown 
             headers: {
               "Content-Type": "application/json",
             },
+            signal: AbortSignal.timeout(8000),
             body: JSON.stringify({
               contents: [{ parts: [{ text: systemPrompt }] }],
               generationConfig: {
@@ -233,7 +243,11 @@ Respond ONLY with the body of the email. Do not include subject lines, markdown 
           const candidateText =
             data?.candidates?.[0]?.content?.parts?.[0]?.text;
           if (candidateText && typeof candidateText === "string") {
-            draftText = candidateText.trim();
+            // Strip any accidental markdown fences (```markdown ... ```)
+            draftText = candidateText
+              .replace(/^```[a-z]*\s*\n?/i, "")
+              .replace(/\n?```\s*$/i, "")
+              .trim();
             source = "gemini";
           }
         }
