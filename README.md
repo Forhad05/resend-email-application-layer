@@ -3,11 +3,8 @@
 > A production-grade, bidirectional support inbox and transactional email platform built with **Next.js 16 (Turbopack + PPR)**, **Resend**, **PostgreSQL 16 (Drizzle ORM)**, and **Better Auth**.
 
 [![Next.js 16](https://img.shields.io/badge/Next.js-16.4.2-black?style=flat-square&logo=next.js)](https://nextjs.org/)
-[![TypeScript](https://img.shields.io/badge/TypeScript-5.x-blue?style=flat-square&logo=typescript)](https://www.typescriptlang.org/)
-[![Tailwind CSS 4](https://img.shields.io/badge/TailwindCSS-v4-38bdf8?style=flat-square&logo=tailwind-css)](https://tailwindcss.com/)
-[![Drizzle ORM](https://img.shields.io/badge/Drizzle_ORM-0.45.4-C5F74F?style=flat-square)](https://orm.drizzle.team/)
-[![PostgreSQL](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat-square&logo=postgresql)](https://www.postgresql.org/)
-[![Resend](https://img.shields.io/badge/Resend-API-black?style=flat-square)](https://resend.com/)
+[![Resend](https://img.shields.io/badge/Resend-Email_API-black?style=flat-square)](https://resend.com/)
+[![PostgreSQL 16](https://img.shields.io/badge/PostgreSQL-16-336791?style=flat-square&logo=postgresql)](https://www.postgresql.org/)
 [![License: MIT](https://img.shields.io/badge/License-MIT-emerald.svg?style=flat-square)](LICENSE)
 
 ---
@@ -103,6 +100,9 @@
 
 This blueprint maps all physical boundaries, runtime components, edge services, and network channels connecting the Next.js 16 application, PostgreSQL, Cloudflare edge infrastructure, and Resend.
 
+<details>
+<summary><b>🔍 Expand System Topology Diagram (Mermaid)</b></summary>
+
 ```mermaid
 flowchart TB
     subgraph CLIENT["🧑‍💻 User / Support Agent Browser"]
@@ -195,11 +195,16 @@ flowchart TB
     DB_ORM --> STORAGE
 ```
 
+</details>
+
 ---
 
 ### 2. Inbound Dual-Routing & MIME Stream Parsing
 
 This blueprint illustrates the lifecycle of incoming customer emails: stream bifurcation at Cloudflare Worker edge, secure tunnel transmission, RFC 822 decoding, header matching, and zero-reload timeline updates.
+
+<details>
+<summary><b>🔍 Expand Inbound Dual-Routing Sequence Diagram (Mermaid)</b></summary>
 
 ```mermaid
 sequenceDiagram
@@ -252,11 +257,16 @@ sequenceDiagram
     Agent->>Agent: Trigger router.refresh() & display slide-in notification toast
 ```
 
+</details>
+
 ---
 
 ### 3. Outbound Multi-Identity & Suppression Protection
 
 This blueprint details outbound message preparation: dynamic sender identity selection, pre-flight suppression validation, server-side enforcement, Resend API transmission, and delivery lifecycle webhook synchronization.
+
+<details>
+<summary><b>🔍 Expand Outbound Lifecycle Flowchart (Mermaid)</b></summary>
 
 ```mermaid
 flowchart TD
@@ -286,11 +296,16 @@ flowchart TD
     EVENT_TYPE -->|email.complained| HANDLE_COMPLAINT["UPDATE 'messages' status = 'complained'\nINSERT into 'suppressions' (reason: 'complaint')"]
 ```
 
+</details>
+
 ---
 
 ### 4. Ticket Workflows & Team Collaboration State Machine
 
 This state machine blueprint depicts how customer conversations transition through states, priorities, agent assignments, and private team internal notes.
+
+<details>
+<summary><b>🔍 Expand Ticket State Machine Diagram (Mermaid)</b></summary>
 
 ```mermaid
 stateDiagram-v2
@@ -343,11 +358,16 @@ stateDiagram-v2
     }
 ```
 
+</details>
+
 ---
 
 ### 5. Transactional Engine & Variable Interpolation
 
 This blueprint diagrams the programmatic transactional sending workflow, template resolution, dynamic token replacement, and duplicate prevention.
+
+<details>
+<summary><b>🔍 Expand Transactional Engine Flowchart (Mermaid)</b></summary>
 
 ```mermaid
 flowchart LR
@@ -370,11 +390,16 @@ flowchart LR
     PERSIST --> DONE["Return { success: true, emailId }"]
 ```
 
+</details>
+
 ---
 
 ### 6. Relational Database Entity-Relationship Blueprint (ERD)
 
-This diagram details all 9 core application tables, Better Auth tables, foreign key constraints, and relational cardinatlities implemented in Drizzle ORM ([`lib/db/schema.ts`](file:///home/apon/Projects/email-application/lib/db/schema.ts)).
+This diagram details all 9 core application tables, Better Auth tables, foreign key constraints, and relational cardinalities implemented in Drizzle ORM ([`lib/db/schema.ts`](lib/db/schema.ts)).
+
+<details>
+<summary><b>🔍 Expand Database Entity-Relationship Diagram (Mermaid)</b></summary>
 
 ```mermaid
 erDiagram
@@ -532,6 +557,8 @@ erDiagram
         timestamp updated_at
     }
 ```
+
+</details>
 
 ---
 
@@ -972,17 +999,21 @@ If this open-source tool has been valuable to you and you'd like to support inde
 <!-- markdownlint-disable -->
 <p align="center">
   <a href="https://app.binance.com/uni-qr/EEW2yX2x" target="_blank" rel="noopener noreferrer">
-    <img src="public/Binance_pay.jpg" alt="Binance Pay QR - Mahafuzul Haque" width="240" />
+    <strong>👉 Pay Directly via Binance Pay</strong>
   </a>
   <br />
   <strong>Payee:</strong> <code>Mahafuzul Haque</code>
-  <br /><br />
+</p>
+
+<details align="center">
+  <summary><b>📱 Click to Reveal Binance Pay QR Code (Scan to Pay)</b></summary>
+  <br />
   <a href="https://app.binance.com/uni-qr/EEW2yX2x" target="_blank" rel="noopener noreferrer">
-    <img src="https://img.shields.io/badge/Pay%20via-Binance%20Pay-F0B90B?style=for-the-badge&logo=binance&logoColor=black" alt="Pay via Binance Pay" />
+    <img src="public/Binance_pay.jpg" alt="Binance Pay QR - Mahafuzul Haque" width="240" loading="lazy" />
   </a>
   <br />
-  <em>Scan with the Binance App or click above to pay directly via Binance Pay</em>
-</p>
+  <em>Scan with the Binance App to pay directly</em>
+</details>
 <!-- markdownlint-enable -->
 
 ### Direct Payment Link
